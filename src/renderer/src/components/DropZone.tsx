@@ -1,0 +1,53 @@
+import { useCallback } from 'react'
+
+interface DropZoneProps {
+    onFileDrop: (file: File) => void
+}
+
+export function DropZone({ onFileDrop }: DropZoneProps): JSX.Element {
+    const handleDrop = useCallback(
+        (e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault()
+            e.stopPropagation()
+
+            const files = e.dataTransfer.files
+            if (files.length > 0) {
+                const file = files[0]
+                if (file.name.endsWith('.vrm')) {
+                    onFileDrop(file)
+                } else {
+                    alert('VRMファイルをドロップしてください')
+                }
+            }
+        },
+        [onFileDrop]
+    )
+
+    const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault()
+        e.stopPropagation()
+    }, [])
+
+    const handleClick = useCallback(() => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = '.vrm'
+        input.onchange = (e) => {
+            const files = (e.target as HTMLInputElement).files
+            if (files && files.length > 0) {
+                onFileDrop(files[0])
+            }
+        }
+        input.click()
+    }, [onFileDrop])
+
+    return (
+        <div className="drop-zone" onDrop={handleDrop} onDragOver={handleDragOver} onClick={handleClick}>
+            <div className="drop-zone-content">
+                <div className="drop-zone-icon">📁</div>
+                <h2>VRMファイルをドロップ</h2>
+                <p>または、クリックしてファイルを選択</p>
+            </div>
+        </div>
+    )
+}

@@ -1,0 +1,281 @@
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --accent: #e94560;
+  --accent-hover: #ff6b6b;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --success: #4ade80;
+  --danger: #ef4444;
+  --border-radius: 12px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  max-height: 100vh;
+  gap: 12px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.app-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--accent) 0%, #ff9a8b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-header .subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.app-main {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vrm-viewer {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  background: var(--bg-primary);
+}
+
+.vrm-viewer canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ドロップゾーン */
+.drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  cursor: pointer;
+  border: 3px dashed var(--bg-tertiary);
+  border-radius: var(--border-radius);
+  transition: all 0.3s ease;
+}
+
+.drop-zone:hover {
+  border-color: var(--accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.drop-zone-content {
+  text-align: center;
+}
+
+.drop-zone-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+.drop-zone h2 {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.drop-zone p {
+  color: var(--text-secondary);
+}
+
+/* コントロールパネル */
+.app-controls {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.controls h3 {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  margin-top: 20px;
+}
+
+.controls h3:first-child {
+  margin-top: 0;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-button {
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.control-button:hover {
+  background: var(--accent);
+  transform: translateY(-2px);
+}
+
+.control-button.active {
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(233, 69, 96, 0.5);
+}
+
+.control-button.toggle {
+  font-size: 1rem;
+}
+
+.control-button.danger {
+  background: var(--danger);
+}
+
+.control-button.danger:hover {
+  background: #dc2626;
+}
+
+/* ステータスバー */
+.status-bar {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--bg-tertiary);
+}
+
+.status-bar p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.status-online {
+  color: var(--success);
+}
+
+.status-offline {
+  color: var(--text-secondary);
+}
+
+/* セレクトボックス */
+.control-select {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23ffffff' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.control-select:focus {
+  outline: 2px solid var(--accent);
+}
+
+/* 出力サイズバッジ */
+.output-size-badge {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* セカンダリボタン */
+.control-button.secondary {
+  background: transparent;
+  border: 1px solid var(--bg-tertiary);
+}
+
+.control-button.secondary:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent);
+}
+
+/* 仮想カメラボタン */
+.control-button.virtual-camera {
+  font-size: 1rem;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, #0f3460 100%);
+}
+
+.control-button.virtual-camera.active {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 24px rgba(34, 197, 94, 0.8);
+  }
+}
+
+.control-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.control-button:disabled:hover {
+  transform: none;
+  background: var(--bg-tertiary);
+}
+
+.control-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
