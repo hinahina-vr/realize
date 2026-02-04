@@ -15,7 +15,7 @@ interface ControlsProps {
     selectedDeviceId: string
     onDeviceChange: (deviceId: string) => void
     backgroundImage: string | null
-    onBackgroundChange: (file: File | null) => void
+    onBackgroundChange: (file: File | null, filePath?: string | null) => void
     isGreenScreen: boolean
     onGreenScreenToggle: () => void
     outputSize: OutputSize
@@ -80,21 +80,22 @@ export function Controls({
     hasCustomCameraPosition,
     onResetCameraPosition
 }: ControlsProps): JSX.Element {
-    const handleBackgroundSelect = useCallback(() => {
-        const input = document.createElement('input')
-        input.type = 'file'
-        input.accept = 'image/*'
-        input.onchange = (e) => {
-            const files = (e.target as HTMLInputElement).files
-            if (files && files.length > 0) {
-                onBackgroundChange(files[0])
+    const handleBackgroundSelect = useCallback(async () => {
+        // Electronのダイアログを使用してパスを確実に取得
+        const filePath = await window.api.dialog.openImage()
+        if (filePath) {
+            // ファイルをバッファとして読み込み
+            const buffer = await window.api.file.readAsBuffer(filePath)
+            if (buffer) {
+                const blob = new Blob([buffer], { type: 'image/*' })
+                const file = new File([blob], filePath.split(/[/\\]/).pop() || 'background.png', { type: 'image/*' })
+                onBackgroundChange(file, filePath)
                 // 画像選択時はグリーンバックをOFFに
                 if (isGreenScreen) {
                     onGreenScreenToggle()
                 }
             }
         }
-        input.click()
     }, [onBackgroundChange, isGreenScreen, onGreenScreenToggle])
 
     const handleAnimationSelect = useCallback(() => {

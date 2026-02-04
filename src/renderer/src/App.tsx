@@ -392,15 +392,20 @@ function App(): JSX.Element {
     }, [])
 
     const handleBackgroundChange = useCallback(
-        (file: File | null) => {
+        (file: File | null, filePath?: string | null) => {
             if (backgroundImage) {
                 URL.revokeObjectURL(backgroundImage)
             }
             if (file) {
                 const url = URL.createObjectURL(file)
                 setBackgroundImage(url)
+                // ファイルパスがあれば保存
+                if (filePath) {
+                    setLastBackgroundPath(filePath)
+                }
             } else {
                 setBackgroundImage(null)
+                setLastBackgroundPath(null)
             }
         },
         [backgroundImage]
