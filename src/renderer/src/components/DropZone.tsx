@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 
 interface DropZoneProps {
-    onFileDrop: (file: File) => void
+    onFileDrop: (file: File, filePath: string | null) => void
     lastVrmPath?: string | null
     onLoadLastVrm?: () => void
 }
@@ -16,7 +16,9 @@ export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZonePro
             if (files.length > 0) {
                 const file = files[0]
                 if (file.name.endsWith('.vrm')) {
-                    onFileDrop(file)
+                    // Electronでは File オブジェクトに path プロパティがある
+                    const filePath = (file as File & { path?: string }).path || null
+                    onFileDrop(file, filePath)
                 } else {
                     alert('VRMファイルをドロップしてください')
                 }
@@ -37,7 +39,9 @@ export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZonePro
         input.onchange = (e) => {
             const files = (e.target as HTMLInputElement).files
             if (files && files.length > 0) {
-                onFileDrop(files[0])
+                const file = files[0]
+                const filePath = (file as File & { path?: string }).path || null
+                onFileDrop(file, filePath)
             }
         }
         input.click()

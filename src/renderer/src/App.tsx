@@ -348,9 +348,12 @@ function App(): JSX.Element {
         }
     }, [])
 
-    const handleFileDrop = useCallback((file: File) => {
+    const handleFileDrop = useCallback((file: File, filePath: string | null) => {
         const url = URL.createObjectURL(file)
         setVrmUrl(url)
+        if (filePath) {
+            setLastVrmPath(filePath)
+        }
     }, [])
 
     const handleBackgroundChange = useCallback(
