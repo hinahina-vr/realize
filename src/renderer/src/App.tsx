@@ -207,6 +207,13 @@ function App(): JSX.Element {
         }
     }, [])
 
+    // 起動時に保存された背景画像を読み込む
+    useEffect(() => {
+        if (lastBackgroundPath && !backgroundImage) {
+            loadBackgroundFromPath(lastBackgroundPath)
+        }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
     // 自動ループする表情のリスト（通常、笑顔、リラックス）
     const loopExpressions: ExpressionType[] = ['neutral', 'happy', 'relaxed']
     const [nextExpressionIndex, setNextExpressionIndex] = useState(0)
