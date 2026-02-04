@@ -36,6 +36,14 @@ interface VRMViewerProps {
     expression?: ExpressionType
     colorAdjustment?: ColorAdjustment
     onPreviewSizeChange?: (size: { width: number; height: number }) => void
+    customCameraPosition?: {
+        position: [number, number, number]
+        target: [number, number, number]
+    } | null
+    onSaveCameraPosition?: () => void
+    cameraRef?: React.MutableRefObject<{
+        getPosition: () => { position: [number, number, number]; target: [number, number, number] }
+    } | null>
 }
 
 // カメラプリセットの位置設定
@@ -396,14 +404,27 @@ function VRMModel({
     return <primitive object={vrm.scene} />
 }
 
-function CameraController({ cameraPreset }: { cameraPreset: 'bust' | 'full' | 'face' }): null {
+function CameraController({ cameraPreset, customCameraPosition }: {
+    cameraPreset: 'bust' | 'full' | 'face'
+    customCameraPosition?: {
+        position: [number, number, number]
+        target: [number, number, number]
+    } | null
+}): null {
     const { camera } = useThree()
 
     useEffect(() => {
-        const preset = CAMERA_PRESETS[cameraPreset]
-        camera.position.set(...(preset.position as [number, number, number]))
-        camera.lookAt(...(preset.target as [number, number, number]))
-    }, [cameraPreset, camera])
+        if (customCameraPosition) {
+            // カスタムカメラ位置を適用
+            camera.position.set(...customCameraPosition.position)
+            camera.lookAt(...customCameraPosition.target)
+        } else {
+            // プリセットを適用
+            const preset = CAMERA_PRESETS[cameraPreset]
+            camera.position.set(...(preset.position as [number, number, number]))
+            camera.lookAt(...(preset.target as [number, number, number]))
+        }
+    }, [cameraPreset, customCameraPosition, camera])
 
     return null
 }
@@ -462,11 +483,37 @@ export function VRMViewer({
     animationUrl,
     expression,
     colorAdjustment,
-    onPreviewSizeChange
+    onPreviewSizeChange,
+    customCameraPosition,
+    cameraRef
 }: VRMViewerProps): JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null)
+    const orbitControlsRef = useRef<any>(null)
     const { width, height } = OUTPUT_SIZE_MAP[outputSize]
     const aspectRatio = width / height
+
+    // cameraRefにカメラ位置取得関数を設定
+    useEffect(() => {
+        if (cameraRef) {
+            cameraRef.current = {
+                getPosition: () => {
+                    const controls = orbitControlsRef.current
+                    if (controls) {
+                        const camera = controls.object
+                        const target = controls.target
+                        return {
+                            position: [camera.position.x, camera.position.y, camera.position.z] as [number, number, number],
+                            target: [target.x, target.y, target.z] as [number, number, number]
+                        }
+                    }
+                    return {
+                        position: [0, 1.3, 1.5] as [number, number, number],
+                        target: [0, 1.3, 0] as [number, number, number]
+                    }
+                }
+            }
+        }
+    }, [cameraRef])
 
     // プレビューサイズを報告
     useEffect(() => {
@@ -525,9 +572,10 @@ export function VRMViewer({
                     animationUrl={animationUrl}
                     expression={expression}
                 />
-                <CameraController cameraPreset={cameraPreset} />
+                <CameraController cameraPreset={cameraPreset} customCameraPosition={customCameraPosition} />
                 <OrbitControls
-                    target={CAMERA_PRESETS[cameraPreset].target as THREE.Vector3Tuple}
+                    ref={orbitControlsRef}
+                    target={customCameraPosition ? customCameraPosition.target as unknown as THREE.Vector3Tuple : CAMERA_PRESETS[cameraPreset].target as THREE.Vector3Tuple}
                     enablePan={true}
                     panSpeed={1.5}
                     screenSpacePanning={true}

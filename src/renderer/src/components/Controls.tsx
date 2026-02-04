@@ -35,6 +35,9 @@ interface ControlsProps {
     onAutoExpressionToggle: () => void
     expressionInterval: number
     onExpressionIntervalChange: (interval: number) => void
+    onSaveCameraPosition?: () => void
+    hasCustomCameraPosition?: boolean
+    onResetCameraPosition?: () => void
 }
 
 const OUTPUT_SIZES: { value: OutputSize; label: string }[] = [
@@ -72,7 +75,10 @@ export function Controls({
     isAutoExpression,
     onAutoExpressionToggle,
     expressionInterval,
-    onExpressionIntervalChange
+    onExpressionIntervalChange,
+    onSaveCameraPosition,
+    hasCustomCameraPosition,
+    onResetCameraPosition
 }: ControlsProps): JSX.Element {
     const handleBackgroundSelect = useCallback(() => {
         const input = document.createElement('input')
@@ -134,6 +140,26 @@ export function Controls({
                 >
                     顔アップ
                 </button>
+            </div>
+            <div className="control-group camera-memory-group">
+                {onSaveCameraPosition && (
+                    <button
+                        className="control-button save-camera-btn"
+                        onClick={onSaveCameraPosition}
+                        title="現在のカメラ位置を記憶"
+                    >
+                        💾 位置記憶
+                    </button>
+                )}
+                {hasCustomCameraPosition && onResetCameraPosition && (
+                    <button
+                        className="control-button reset-camera-btn"
+                        onClick={onResetCameraPosition}
+                        title="記憶したカメラ位置をクリア"
+                    >
+                        🗑️ リセット
+                    </button>
+                )}
             </div>
 
             <h3>🎤 リップシンク</h3>

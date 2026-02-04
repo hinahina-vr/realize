@@ -32,19 +32,18 @@ export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZonePro
         e.stopPropagation()
     }, [])
 
-    const handleClick = useCallback(() => {
-        const input = document.createElement('input')
-        input.type = 'file'
-        input.accept = '.vrm'
-        input.onchange = (e) => {
-            const files = (e.target as HTMLInputElement).files
-            if (files && files.length > 0) {
-                const file = files[0]
-                const filePath = (file as File & { path?: string }).path || null
+    const handleClick = useCallback(async () => {
+        // Electronのダイアログを使用してパスを確実に取得
+        const filePath = await window.api.dialog.openVrm()
+        if (filePath) {
+            // ファイルをバッファとして読み込み
+            const buffer = await window.api.file.readAsBuffer(filePath)
+            if (buffer) {
+                const blob = new Blob([buffer], { type: 'application/octet-stream' })
+                const file = new File([blob], filePath.split(/[/\\]/).pop() || 'model.vrm', { type: 'application/octet-stream' })
                 onFileDrop(file, filePath)
             }
         }
-        input.click()
     }, [onFileDrop])
 
     // ファイル名だけを取得

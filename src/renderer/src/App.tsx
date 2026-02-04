@@ -44,6 +44,10 @@ export interface AppSettings {
     outputSize: OutputSize
     colorAdjustment: ColorAdjustment
     theme: ThemeType
+    customCameraPosition: {
+        position: [number, number, number]
+        target: [number, number, number]
+    } | null
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -56,7 +60,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     isGreenScreen: false,
     outputSize: '1280x720',
     colorAdjustment: { brightness: 0, contrast: 0, saturation: 0 },
-    theme: 'dark-rum'
+    theme: 'dark-rum',
+    customCameraPosition: null
 }
 
 const SETTINGS_KEY = 'realize_settings'
@@ -105,9 +110,25 @@ function App(): JSX.Element {
     const [expressionInterval, setExpressionInterval] = useState(initialSettings.expressionInterval)
     const [isGreenScreen, setIsGreenScreen] = useState(initialSettings.isGreenScreen)
     const [theme, setTheme] = useState<ThemeType>(initialSettings.theme)
+    const [customCameraPosition, setCustomCameraPosition] = useState<{
+        position: [number, number, number]
+        target: [number, number, number]
+    } | null>(initialSettings.customCameraPosition)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const frameIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const autoExpressionRef = useRef<NodeJS.Timeout | null>(null)
+    const cameraRef = useRef<{
+        getPosition: () => { position: [number, number, number]; target: [number, number, number] }
+    } | null>(null)
+
+    // カメラ位置を記憶
+    const saveCameraPosition = useCallback(() => {
+        if (cameraRef.current) {
+            const pos = cameraRef.current.getPosition()
+            setCustomCameraPosition(pos)
+            alert('カメラ位置を記憶しました！')
+        }
+    }, [])
 
     // テーマをHTMLに適用
     useEffect(() => {
@@ -141,10 +162,11 @@ function App(): JSX.Element {
             isGreenScreen,
             outputSize,
             colorAdjustment,
-            theme
+            theme,
+            customCameraPosition
         }
         saveSettings(settings)
-    }, [lastVrmPath, lastBackgroundPath, cameraPreset, isLipSyncEnabled, isAutoExpression, expressionInterval, isGreenScreen, outputSize, colorAdjustment, theme])
+    }, [lastVrmPath, lastBackgroundPath, cameraPreset, isLipSyncEnabled, isAutoExpression, expressionInterval, isGreenScreen, outputSize, colorAdjustment, theme, customCameraPosition])
 
     // ファイルパスからVRMを読み込む
     const loadVrmFromPath = useCallback(async (filePath: string) => {
@@ -452,6 +474,8 @@ function App(): JSX.Element {
                             expression={currentExpression}
                             colorAdjustment={colorAdjustment}
                             onPreviewSizeChange={setPreviewSize}
+                            customCameraPosition={customCameraPosition}
+                            cameraRef={cameraRef}
                         />
                         <div className="expression-buttons">
                             <button
@@ -549,6 +573,9 @@ function App(): JSX.Element {
                     onExpressionIntervalChange={setExpressionInterval}
                     isGreenScreen={isGreenScreen}
                     onGreenScreenToggle={() => setIsGreenScreen(!isGreenScreen)}
+                    onSaveCameraPosition={saveCameraPosition}
+                    hasCustomCameraPosition={!!customCameraPosition}
+                    onResetCameraPosition={() => setCustomCameraPosition(null)}
                 />
             </aside>
 
