@@ -18,18 +18,105 @@ const OUTPUT_SIZE_MAP: Record<OutputSize, { width: number; height: number; label
     '640x360': { width: 640, height: 360, label: '360p (低帯域)' }
 }
 
+export type ExpressionType = 'neutral' | 'happy' | 'angry' | 'sad' | 'relaxed' | 'surprised'
+
+export interface ColorAdjustment {
+    brightness: number
+    contrast: number
+    saturation: number
+}
+
 function App(): JSX.Element {
     const [vrmUrl, setVrmUrl] = useState<string | null>(null)
     const [cameraPreset, setCameraPreset] = useState<'bust' | 'full' | 'face'>('bust')
-    const [isLipSyncEnabled, setIsLipSyncEnabled] = useState(false)
+    const [isLipSyncEnabled, setIsLipSyncEnabled] = useState(true)
     const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([])
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null)
     const [outputSize, setOutputSize] = useState<OutputSize>('1280x720')
     const [isVirtualCameraOn, setIsVirtualCameraOn] = useState(false)
     const [isVirtualCameraConnecting, setIsVirtualCameraConnecting] = useState(false)
+    const [animationUrl, setAnimationUrl] = useState<string | null>(null)
+    const [currentExpression, setCurrentExpression] = useState<ExpressionType>('happy')
+    const [colorAdjustment, setColorAdjustment] = useState<ColorAdjustment>({
+        brightness: 0,
+        contrast: 0,
+        saturation: 0
+    })
+    const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 })
+    const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight })
+    const [isAutoExpression, setIsAutoExpression] = useState(true)
+    const [expressionInterval, setExpressionInterval] = useState(5) // 秒
+    const [isGreenScreen, setIsGreenScreen] = useState(false)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const frameIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const autoExpressionRef = useRef<NodeJS.Timeout | null>(null)
+
+    // ウィンドウサイズを監視
+    useEffect(() => {
+        const handleResize = (): void => {
+            setWindowSize({ width: window.innerWidth, height: window.innerHeight })
+        }
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    // 自動ループする表情のリスト（通常、笑顔、リラックス）
+    const loopExpressions: ExpressionType[] = ['neutral', 'happy', 'relaxed']
+    const [nextExpressionIndex, setNextExpressionIndex] = useState(0)
+    const [expressionProgress, setExpressionProgress] = useState(0)
+
+    // ランダムに次の表情を選択（現在の表情以外から）
+    const getRandomNextIndex = (currentIndex: number): number => {
+        let next: number
+        do {
+            next = Math.floor(Math.random() * loopExpressions.length)
+        } while (next === currentIndex && loopExpressions.length > 1)
+        return next
+    }
+
+    // 自動表情ループ（ランダム）
+    useEffect(() => {
+        if (!isAutoExpression) {
+            if (autoExpressionRef.current) {
+                clearInterval(autoExpressionRef.current)
+                autoExpressionRef.current = null
+            }
+            setExpressionProgress(0)
+            return
+        }
+
+        // 最初の表情をランダムに設定
+        let currentIdx = Math.floor(Math.random() * loopExpressions.length)
+        setCurrentExpression(loopExpressions[currentIdx])
+        let nextIdx = getRandomNextIndex(currentIdx)
+        setNextExpressionIndex(nextIdx)
+        setExpressionProgress(0)
+
+        // 進捗更新（100msごと）
+        const progressInterval = setInterval(() => {
+            setExpressionProgress((prev) => {
+                const step = 100 / (expressionInterval * 10)
+                return Math.min(prev + step, 100)
+            })
+        }, 100)
+
+        // 表情変更
+        autoExpressionRef.current = setInterval(() => {
+            currentIdx = nextIdx
+            setCurrentExpression(loopExpressions[currentIdx])
+            nextIdx = getRandomNextIndex(currentIdx)
+            setNextExpressionIndex(nextIdx)
+            setExpressionProgress(0)
+        }, expressionInterval * 1000)
+
+        return () => {
+            if (autoExpressionRef.current) {
+                clearInterval(autoExpressionRef.current)
+            }
+            clearInterval(progressInterval)
+        }
+    }, [isAutoExpression, expressionInterval])
 
     // オーディオデバイスを取得
     useEffect(() => {
@@ -163,24 +250,103 @@ function App(): JSX.Element {
         [backgroundImage]
     )
 
+    const handleAnimationChange = useCallback(
+        (file: File | null) => {
+            if (animationUrl) {
+                URL.revokeObjectURL(animationUrl)
+            }
+            if (file) {
+                const url = URL.createObjectURL(file)
+                setAnimationUrl(url)
+            } else {
+                setAnimationUrl(null)
+            }
+        },
+        [animationUrl]
+    )
+
     return (
         <div className="app">
             <header className="app-header">
                 <h1>リアライズ</h1>
                 <p className="subtitle">VRM仮想カメラ</p>
-                <div className="output-size-badge">📐 {outputSize}</div>
+                <div className="resolution-info">
+                    <span className="resolution-badge window">
+                        🖥️ {windowSize.width}x{windowSize.height}
+                    </span>
+                    <span className="resolution-badge preview">
+                        👁️ プレビュー: {previewSize.width}x{previewSize.height}
+                    </span>
+                    <span className={`resolution-badge output ${isVirtualCameraOn ? 'active' : ''}`}>
+                        🎥 出力: {outputSize}
+                    </span>
+                </div>
             </header>
 
             <main className="app-main">
                 {vrmUrl ? (
-                    <VRMViewer
-                        vrmUrl={vrmUrl}
-                        cameraPreset={cameraPreset}
-                        isLipSyncEnabled={isLipSyncEnabled}
-                        selectedDeviceId={selectedDeviceId}
-                        backgroundImage={backgroundImage}
-                        outputSize={outputSize}
-                    />
+                    <>
+                        <VRMViewer
+                            vrmUrl={vrmUrl}
+                            cameraPreset={cameraPreset}
+                            isLipSyncEnabled={isLipSyncEnabled}
+                            selectedDeviceId={selectedDeviceId}
+                            backgroundImage={backgroundImage}
+                            isGreenScreen={isGreenScreen}
+                            outputSize={outputSize}
+                            animationUrl={animationUrl}
+                            expression={currentExpression}
+                            colorAdjustment={colorAdjustment}
+                            onPreviewSizeChange={setPreviewSize}
+                        />
+                        <div className="expression-buttons">
+                            <button
+                                className={`expression-btn ${currentExpression === 'neutral' ? 'active' : ''} ${isAutoExpression && currentExpression === 'neutral' ? 'countdown' : ''} ${isAutoExpression && loopExpressions[nextExpressionIndex] === 'neutral' ? 'next' : ''}`}
+                                onClick={() => setCurrentExpression('neutral')}
+                                style={isAutoExpression && currentExpression === 'neutral' ? { '--progress': `${expressionProgress}%` } as React.CSSProperties : {}}
+                            >
+                                <span className="emoji">😐</span>
+                                <span>通常</span>
+                            </button>
+                            <button
+                                className={`expression-btn ${currentExpression === 'happy' ? 'active' : ''} ${isAutoExpression && currentExpression === 'happy' ? 'countdown' : ''} ${isAutoExpression && loopExpressions[nextExpressionIndex] === 'happy' ? 'next' : ''}`}
+                                onClick={() => setCurrentExpression('happy')}
+                                style={isAutoExpression && currentExpression === 'happy' ? { '--progress': `${expressionProgress}%` } as React.CSSProperties : {}}
+                            >
+                                <span className="emoji">😊</span>
+                                <span>笑顔</span>
+                            </button>
+                            <button
+                                className={`expression-btn ${currentExpression === 'angry' ? 'active' : ''}`}
+                                onClick={() => setCurrentExpression('angry')}
+                            >
+                                <span className="emoji">😠</span>
+                                <span>怒り</span>
+                            </button>
+                            <button
+                                className={`expression-btn ${currentExpression === 'sad' ? 'active' : ''}`}
+                                onClick={() => setCurrentExpression('sad')}
+                            >
+                                <span className="emoji">😢</span>
+                                <span>悲しい</span>
+                            </button>
+                            <button
+                                className={`expression-btn ${currentExpression === 'relaxed' ? 'active' : ''} ${isAutoExpression && currentExpression === 'relaxed' ? 'countdown' : ''} ${isAutoExpression && loopExpressions[nextExpressionIndex] === 'relaxed' ? 'next' : ''}`}
+                                onClick={() => setCurrentExpression('relaxed')}
+                                style={isAutoExpression && currentExpression === 'relaxed' ? { '--progress': `${expressionProgress}%` } as React.CSSProperties : {}}
+                            >
+                                <span className="emoji">😌</span>
+                                <span>ﾘﾗｯｸｽ</span>
+                            </button>
+                            <button
+                                className={`expression-btn ${currentExpression === 'surprised' ? 'active' : ''}`}
+                                onClick={() => setCurrentExpression('surprised')}
+                            >
+                                <span className="emoji">😲</span>
+                                <span>驚き</span>
+                            </button>
+                        </div>
+                    </>
                 ) : (
                     <DropZone onFileDrop={handleFileDrop} />
                 )}
@@ -209,6 +375,18 @@ function App(): JSX.Element {
                         }
                     }}
                     hasVrm={!!vrmUrl}
+                    animationUrl={animationUrl}
+                    onAnimationChange={handleAnimationChange}
+                    colorAdjustment={colorAdjustment}
+                    onColorAdjustmentChange={setColorAdjustment}
+                    expression={currentExpression}
+                    onExpressionChange={setCurrentExpression}
+                    isAutoExpression={isAutoExpression}
+                    onAutoExpressionToggle={() => setIsAutoExpression(!isAutoExpression)}
+                    expressionInterval={expressionInterval}
+                    onExpressionIntervalChange={setExpressionInterval}
+                    isGreenScreen={isGreenScreen}
+                    onGreenScreenToggle={() => setIsGreenScreen(!isGreenScreen)}
                 />
             </aside>
 

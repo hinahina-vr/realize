@@ -1,9 +1,11 @@
 import { useRef, useEffect, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
+import { EffectComposer, Bloom, BrightnessContrast, HueSaturation } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { VRMLoaderPlugin, VRM, VRMExpressionPresetName } from '@pixiv/three-vrm'
+import { VRMAnimationLoaderPlugin, VRMAnimation, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
 import type { OutputSize } from '../App'
 
 // 解像度からアスペクト比を計算
@@ -14,13 +16,26 @@ const OUTPUT_SIZE_MAP: Record<OutputSize, { width: number; height: number }> = {
     '640x360': { width: 640, height: 360 }
 }
 
+export type ExpressionType = 'neutral' | 'happy' | 'angry' | 'sad' | 'relaxed' | 'surprised'
+
+export interface ColorAdjustment {
+    brightness: number
+    contrast: number
+    saturation: number
+}
+
 interface VRMViewerProps {
     vrmUrl: string
     cameraPreset: 'bust' | 'full' | 'face'
     isLipSyncEnabled: boolean
     selectedDeviceId: string
     backgroundImage?: string | null
+    isGreenScreen?: boolean
     outputSize: OutputSize
+    animationUrl?: string | null
+    expression?: ExpressionType
+    colorAdjustment?: ColorAdjustment
+    onPreviewSizeChange?: (size: { width: number; height: number }) => void
 }
 
 // カメラプリセットの位置設定
@@ -34,17 +49,23 @@ function VRMModel({
     vrmUrl,
     isLipSyncEnabled,
     selectedDeviceId,
+    animationUrl,
+    expression,
     onVrmLoad
 }: {
     vrmUrl: string
     isLipSyncEnabled: boolean
     selectedDeviceId: string
+    animationUrl?: string | null
+    expression?: ExpressionType
     onVrmLoad?: (vrm: VRM) => void
 }): JSX.Element | null {
     const [vrm, setVrm] = useState<VRM | null>(null)
     const analyserRef = useRef<AnalyserNode | null>(null)
     const audioContextRef = useRef<AudioContext | null>(null)
     const streamRef = useRef<MediaStream | null>(null)
+    const mixerRef = useRef<THREE.AnimationMixer | null>(null)
+    const currentActionRef = useRef<THREE.AnimationAction | null>(null)
 
     // VRM読み込み
     useEffect(() => {
@@ -57,7 +78,34 @@ function VRMModel({
                 const loadedVrm = gltf.userData.vrm as VRM
                 if (loadedVrm) {
                     loadedVrm.scene.rotation.y = Math.PI
+
+                    // Yポーズを適用（TポーズからYポーズへ）
+                    const humanoid = loadedVrm.humanoid
+                    if (humanoid) {
+                        // 左腕を下げる
+                        const leftUpperArm = humanoid.getNormalizedBoneNode('leftUpperArm')
+                        if (leftUpperArm) {
+                            leftUpperArm.rotation.z = Math.PI * 0.4 // 約70度下げる
+                        }
+                        const leftLowerArm = humanoid.getNormalizedBoneNode('leftLowerArm')
+                        if (leftLowerArm) {
+                            leftLowerArm.rotation.z = Math.PI * 0.1
+                        }
+
+                        // 右腕を下げる
+                        const rightUpperArm = humanoid.getNormalizedBoneNode('rightUpperArm')
+                        if (rightUpperArm) {
+                            rightUpperArm.rotation.z = -Math.PI * 0.4 // 約70度下げる
+                        }
+                        const rightLowerArm = humanoid.getNormalizedBoneNode('rightLowerArm')
+                        if (rightLowerArm) {
+                            rightLowerArm.rotation.z = -Math.PI * 0.1
+                        }
+                    }
+
                     setVrm(loadedVrm)
+                    // AnimationMixerを作成
+                    mixerRef.current = new THREE.AnimationMixer(loadedVrm.scene)
                     onVrmLoad?.(loadedVrm)
                     console.log('VRM loaded:', loadedVrm)
                 }
@@ -71,6 +119,10 @@ function VRMModel({
         )
 
         return () => {
+            if (mixerRef.current) {
+                mixerRef.current.stopAllAction()
+                mixerRef.current = null
+            }
             if (vrm) {
                 vrm.scene.traverse((obj) => {
                     if (obj instanceof THREE.Mesh) {
@@ -85,6 +137,38 @@ function VRMModel({
             }
         }
     }, [vrmUrl])
+
+    // アニメーション読み込み
+    useEffect(() => {
+        if (!vrm || !animationUrl || !mixerRef.current) return
+
+        const loader = new GLTFLoader()
+        loader.register((parser) => new VRMAnimationLoaderPlugin(parser))
+
+        loader.load(
+            animationUrl,
+            (gltf) => {
+                const vrmAnimation = gltf.userData.vrmAnimations?.[0] as VRMAnimation | undefined
+                if (vrmAnimation && mixerRef.current) {
+                    // 現在のアニメーションを停止
+                    if (currentActionRef.current) {
+                        currentActionRef.current.fadeOut(0.5)
+                    }
+
+                    // 新しいアニメーションを再生
+                    const clip = createVRMAnimationClip(vrmAnimation, vrm)
+                    const action = mixerRef.current.clipAction(clip)
+                    action.reset().fadeIn(0.5).play()
+                    currentActionRef.current = action
+                    console.log('Animation loaded:', animationUrl)
+                }
+            },
+            undefined,
+            (error) => {
+                console.error('Error loading animation:', error)
+            }
+        )
+    }, [vrm, animationUrl])
 
     // リップシンク用オーディオ設定（デバイス選択対応）
     useEffect(() => {
@@ -151,6 +235,12 @@ function VRMModel({
         if (!vrm) return
 
         vrm.update(delta)
+
+        // AnimationMixerを更新
+        if (mixerRef.current) {
+            mixerRef.current.update(delta)
+        }
+
         timeRef.current += delta
 
         const time = timeRef.current
@@ -212,6 +302,31 @@ function VRMModel({
             setTimeout(() => {
                 vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 0)
             }, 150)
+        }
+
+        // 表情適用
+        if (expression && vrm.expressionManager) {
+            // すべての表情をリセット
+            vrm.expressionManager.setValue(VRMExpressionPresetName.Happy, 0)
+            vrm.expressionManager.setValue(VRMExpressionPresetName.Angry, 0)
+            vrm.expressionManager.setValue(VRMExpressionPresetName.Sad, 0)
+            vrm.expressionManager.setValue(VRMExpressionPresetName.Relaxed, 0)
+            vrm.expressionManager.setValue(VRMExpressionPresetName.Surprised, 0)
+
+            // 選択中の表情を適用
+            const expressionMap: Record<ExpressionType, string> = {
+                neutral: '',
+                happy: VRMExpressionPresetName.Happy,
+                angry: VRMExpressionPresetName.Angry,
+                sad: VRMExpressionPresetName.Sad,
+                relaxed: VRMExpressionPresetName.Relaxed,
+                surprised: VRMExpressionPresetName.Surprised
+            }
+
+            const targetExpression = expressionMap[expression]
+            if (targetExpression) {
+                vrm.expressionManager.setValue(targetExpression, 1)
+            }
         }
 
         // リップシンク
@@ -293,13 +408,35 @@ function CameraController({ cameraPreset }: { cameraPreset: 'bust' | 'full' | 'f
     return null
 }
 
-function Background({ backgroundImage }: { backgroundImage?: string | null }): JSX.Element | null {
-    const { scene } = useThree()
+// 出力解像度でレンダリングを強制
+function RenderSizeController({ width, height }: { width: number; height: number }): null {
+    const { gl, size } = useThree()
 
     useEffect(() => {
-        if (backgroundImage) {
+        // キャンバスの内部解像度を出力解像度に固定
+        gl.setSize(width, height, false)
+        gl.setPixelRatio(1)
+    }, [gl, width, height, size])
+
+    return null
+}
+
+function Background({ backgroundImage, isGreenScreen }: { backgroundImage?: string | null; isGreenScreen?: boolean }): JSX.Element | null {
+    const { scene, gl } = useThree()
+
+    useEffect(() => {
+        // 色補正を無効化
+        gl.toneMapping = THREE.NoToneMapping
+        gl.outputColorSpace = THREE.SRGBColorSpace
+
+        if (isGreenScreen) {
+            // グリーンバック（クロマキー用緑色）
+            scene.background = new THREE.Color(0x00ff00)
+        } else if (backgroundImage) {
             const loader = new THREE.TextureLoader()
             loader.load(backgroundImage, (texture) => {
+                // テクスチャのカラースペースを設定
+                texture.colorSpace = THREE.SRGBColorSpace
                 scene.background = texture
             })
         } else {
@@ -309,7 +446,7 @@ function Background({ backgroundImage }: { backgroundImage?: string | null }): J
         return () => {
             scene.background = new THREE.Color(0x1a1a2e)
         }
-    }, [backgroundImage, scene])
+    }, [backgroundImage, isGreenScreen, scene, gl])
 
     return null
 }
@@ -320,13 +457,44 @@ export function VRMViewer({
     isLipSyncEnabled,
     selectedDeviceId,
     backgroundImage,
-    outputSize
+    isGreenScreen,
+    outputSize,
+    animationUrl,
+    expression,
+    colorAdjustment,
+    onPreviewSizeChange
 }: VRMViewerProps): JSX.Element {
+    const containerRef = useRef<HTMLDivElement>(null)
     const { width, height } = OUTPUT_SIZE_MAP[outputSize]
     const aspectRatio = width / height
 
+    // プレビューサイズを報告
+    useEffect(() => {
+        if (!containerRef.current || !onPreviewSizeChange) return
+
+        const updateSize = (): void => {
+            const rect = containerRef.current?.getBoundingClientRect()
+            if (rect) {
+                onPreviewSizeChange({
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height)
+                })
+            }
+        }
+
+        updateSize()
+        const resizeObserver = new ResizeObserver(updateSize)
+        resizeObserver.observe(containerRef.current)
+
+        return () => resizeObserver.disconnect()
+    }, [onPreviewSizeChange])
+
+    // 色調補正値を計算
+    const brightnessMultiplier = 1 + (colorAdjustment?.brightness || 0) / 100
+
     return (
         <div
+            ref={containerRef}
             className="vrm-viewer"
             style={{ aspectRatio: `${width} / ${height}` }}
         >
@@ -337,17 +505,25 @@ export function VRMViewer({
                     far: 100,
                     position: CAMERA_PRESETS[cameraPreset].position as [number, number, number]
                 }}
-                gl={{ preserveDrawingBuffer: true }}
+                gl={{
+                    preserveDrawingBuffer: true,
+                    antialias: true,
+                    toneMapping: THREE.NoToneMapping
+                }}
+                style={{ width: '100%', height: '100%' }}
+                dpr={[1, 2]}
             >
-                <ambientLight intensity={0.6} />
-                <directionalLight position={[1, 1, 1]} intensity={0.8} />
-                <directionalLight position={[-1, 1, -1]} intensity={0.4} />
+                <ambientLight intensity={0.6 * brightnessMultiplier} />
+                <directionalLight position={[1, 1, 1]} intensity={0.8 * brightnessMultiplier} />
+                <directionalLight position={[-1, 1, -1]} intensity={0.4 * brightnessMultiplier} />
 
-                <Background backgroundImage={backgroundImage} />
+                <Background backgroundImage={backgroundImage} isGreenScreen={isGreenScreen} />
                 <VRMModel
                     vrmUrl={vrmUrl}
                     isLipSyncEnabled={isLipSyncEnabled}
                     selectedDeviceId={selectedDeviceId}
+                    animationUrl={animationUrl}
+                    expression={expression}
                 />
                 <CameraController cameraPreset={cameraPreset} />
                 <OrbitControls
@@ -355,6 +531,8 @@ export function VRMViewer({
                     enablePan={true}
                     panSpeed={1.5}
                     screenSpacePanning={true}
+                    minPolarAngle={Math.PI * 0.3}
+                    maxPolarAngle={Math.PI * 0.65}
                     mouseButtons={{
                         LEFT: THREE.MOUSE.ROTATE,
                         MIDDLE: THREE.MOUSE.PAN,
@@ -367,6 +545,23 @@ export function VRMViewer({
                         BOTTOM: 'ArrowDown'
                     }}
                 />
+
+                {/* ポストプロセッシング一時無効化 */}
+                {/* <EffectComposer multisampling={0}>
+                    <Bloom
+                        intensity={0.5}
+                        luminanceThreshold={0.9}
+                        luminanceSmoothing={0.025}
+                        mipmapBlur
+                    />
+                    <BrightnessContrast
+                        brightness={(colorAdjustment?.brightness || 0) / 200}
+                        contrast={(colorAdjustment?.contrast || 0) / 200}
+                    />
+                    <HueSaturation
+                        saturation={(colorAdjustment?.saturation || 0) / 100}
+                    />
+                </EffectComposer> */}
             </Canvas>
         </div>
     )
