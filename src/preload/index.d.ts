@@ -7,8 +7,19 @@ interface VirtualCameraAPI {
   isReady: () => Promise<boolean>
 }
 
+interface DialogAPI {
+  openVrm: () => Promise<string | null>
+  openImage: () => Promise<string | null>
+}
+
+interface FileAPI {
+  readAsBuffer: (filePath: string) => Promise<Buffer | null>
+}
+
 interface API {
   virtualCamera: VirtualCameraAPI
+  dialog: DialogAPI
+  file: FileAPI
 }
 
 declare global {
@@ -17,3 +28,4 @@ declare global {
     api: API
   }
 }
+

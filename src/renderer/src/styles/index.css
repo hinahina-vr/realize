@@ -1,4 +1,6 @@
-:root {
+/* テーマ定義 */
+:root,
+[data-theme="dark-rum"] {
   --bg-primary: #1a1a2e;
   --bg-secondary: #16213e;
   --bg-tertiary: #0f3460;
@@ -10,6 +12,43 @@
   --danger: #ef4444;
   --border-radius: 12px;
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="white-liquor"] {
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8e8e8;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --success: #10b981;
+  --danger: #ef4444;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="wine-red"] {
+  --bg-primary: #1a0a0a;
+  --bg-secondary: #2d1515;
+  --bg-tertiary: #4a1f1f;
+  --accent: #dc143c;
+  --accent-hover: #ff1a4b;
+  --text-primary: #fff5f5;
+  --text-secondary: #d4a5a5;
+  --success: #4ade80;
+  --danger: #ff4444;
+}
+
+[data-theme="sherry-cask"] {
+  --bg-primary: #1f1408;
+  --bg-secondary: #2e1f0f;
+  --bg-tertiary: #4a3318;
+  --accent: #d4a574;
+  --accent-hover: #e8c097;
+  --text-primary: #fff8f0;
+  --text-secondary: #c9b896;
+  --success: #86efac;
+  --danger: #fb923c;
 }
 
 * {
@@ -48,6 +87,17 @@ body {
   box-shadow: var(--shadow);
 }
 
+.header-logo {
+  display: flex;
+  align-items: center;
+}
+
+.logo-image {
+  height: 36px;
+  width: auto;
+  border-radius: 6px;
+}
+
 .app-header h1 {
   font-size: 1.2rem;
   font-weight: 700;
@@ -67,6 +117,67 @@ body {
   display: flex;
   gap: 8px;
 }
+
+/* 前回のVRM読み込みボタン */
+.load-last-vrm-btn {
+  margin-top: 16px;
+  padding: 12px 24px;
+  background: linear-gradient(145deg, var(--accent), var(--accent-hover));
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+}
+
+.load-last-vrm-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(233, 69, 96, 0.5);
+}
+
+/* テーマ切替ボタン */
+.theme-selector {
+  display: flex;
+  gap: 4px;
+}
+
+.theme-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-btn:hover {
+  transform: scale(1.2);
+}
+
+.theme-btn.active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.theme-btn[data-theme="dark-rum"] {
+  background: linear-gradient(135deg, #1a1a2e, #0f3460);
+}
+
+.theme-btn[data-theme="white-liquor"] {
+  background: linear-gradient(135deg, #f5f5f5, #e8e8e8);
+}
+
+.theme-btn[data-theme="wine-red"] {
+  background: linear-gradient(135deg, #4a1f1f, #dc143c);
+}
+
+.theme-btn[data-theme="sherry-cask"] {
+  background: linear-gradient(135deg, #4a3318, #d4a574);
+}
+
 
 .resolution-badge {
   padding: 3px 8px;

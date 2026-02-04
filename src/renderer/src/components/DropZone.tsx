@@ -2,9 +2,11 @@ import { useCallback } from 'react'
 
 interface DropZoneProps {
     onFileDrop: (file: File) => void
+    lastVrmPath?: string | null
+    onLoadLastVrm?: () => void
 }
 
-export function DropZone({ onFileDrop }: DropZoneProps): JSX.Element {
+export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZoneProps): JSX.Element {
     const handleDrop = useCallback(
         (e: React.DragEvent<HTMLDivElement>) => {
             e.preventDefault()
@@ -41,13 +43,28 @@ export function DropZone({ onFileDrop }: DropZoneProps): JSX.Element {
         input.click()
     }, [onFileDrop])
 
+    // ファイル名だけを取得
+    const lastVrmName = lastVrmPath ? lastVrmPath.split(/[/\\]/).pop() : null
+
     return (
         <div className="drop-zone" onDrop={handleDrop} onDragOver={handleDragOver} onClick={handleClick}>
             <div className="drop-zone-content">
                 <div className="drop-zone-icon">📁</div>
                 <h2>VRMファイルをドロップ</h2>
                 <p>または、クリックしてファイルを選択</p>
+                {lastVrmPath && onLoadLastVrm && (
+                    <button
+                        className="load-last-vrm-btn"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onLoadLastVrm()
+                        }}
+                    >
+                        📂 前回のVRM: {lastVrmName}
+                    </button>
+                )}
             </div>
         </div>
     )
 }
+

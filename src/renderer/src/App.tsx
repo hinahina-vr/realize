@@ -2,6 +2,10 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { VRMViewer } from './components/VRMViewer'
 import { DropZone } from './components/DropZone'
 import { Controls } from './components/Controls'
+import logoImage from './assets/logo.png'
+
+// LoC (ビルド時に固定)
+const LOC_COUNT = 1602
 
 interface AudioDevice {
     deviceId: string
@@ -20,37 +24,95 @@ const OUTPUT_SIZE_MAP: Record<OutputSize, { width: number; height: number; label
 
 export type ExpressionType = 'neutral' | 'happy' | 'angry' | 'sad' | 'relaxed' | 'surprised'
 
+export type ThemeType = 'dark-rum' | 'white-liquor' | 'wine-red' | 'sherry-cask'
+
 export interface ColorAdjustment {
     brightness: number
     contrast: number
     saturation: number
 }
 
+// 永続化する設定
+export interface AppSettings {
+    lastVrmPath: string | null
+    lastBackgroundPath: string | null
+    cameraPreset: 'bust' | 'full' | 'face'
+    isLipSyncEnabled: boolean
+    isAutoExpression: boolean
+    expressionInterval: number
+    isGreenScreen: boolean
+    outputSize: OutputSize
+    colorAdjustment: ColorAdjustment
+    theme: ThemeType
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+    lastVrmPath: null,
+    lastBackgroundPath: null,
+    cameraPreset: 'bust',
+    isLipSyncEnabled: true,
+    isAutoExpression: true,
+    expressionInterval: 5,
+    isGreenScreen: false,
+    outputSize: '1280x720',
+    colorAdjustment: { brightness: 0, contrast: 0, saturation: 0 },
+    theme: 'dark-rum'
+}
+
+const SETTINGS_KEY = 'realize_settings'
+
+function loadSettings(): AppSettings {
+    try {
+        const saved = localStorage.getItem(SETTINGS_KEY)
+        if (saved) {
+            return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
+        }
+    } catch (e) {
+        console.error('Failed to load settings:', e)
+    }
+    return DEFAULT_SETTINGS
+}
+
+function saveSettings(settings: AppSettings): void {
+    try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+    } catch (e) {
+        console.error('Failed to save settings:', e)
+    }
+}
+
 function App(): JSX.Element {
+    // 保存された設定を読み込み
+    const initialSettings = loadSettings()
+
     const [vrmUrl, setVrmUrl] = useState<string | null>(null)
-    const [cameraPreset, setCameraPreset] = useState<'bust' | 'full' | 'face'>('bust')
-    const [isLipSyncEnabled, setIsLipSyncEnabled] = useState(true)
+    const [lastVrmPath, setLastVrmPath] = useState<string | null>(initialSettings.lastVrmPath)
+    const [cameraPreset, setCameraPreset] = useState<'bust' | 'full' | 'face'>(initialSettings.cameraPreset)
+    const [isLipSyncEnabled, setIsLipSyncEnabled] = useState(initialSettings.isLipSyncEnabled)
     const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([])
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null)
-    const [outputSize, setOutputSize] = useState<OutputSize>('1280x720')
+    const [lastBackgroundPath, setLastBackgroundPath] = useState<string | null>(initialSettings.lastBackgroundPath)
+    const [outputSize, setOutputSize] = useState<OutputSize>(initialSettings.outputSize)
     const [isVirtualCameraOn, setIsVirtualCameraOn] = useState(false)
     const [isVirtualCameraConnecting, setIsVirtualCameraConnecting] = useState(false)
     const [animationUrl, setAnimationUrl] = useState<string | null>(null)
     const [currentExpression, setCurrentExpression] = useState<ExpressionType>('happy')
-    const [colorAdjustment, setColorAdjustment] = useState<ColorAdjustment>({
-        brightness: 0,
-        contrast: 0,
-        saturation: 0
-    })
+    const [colorAdjustment, setColorAdjustment] = useState<ColorAdjustment>(initialSettings.colorAdjustment)
     const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 })
     const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight })
-    const [isAutoExpression, setIsAutoExpression] = useState(true)
-    const [expressionInterval, setExpressionInterval] = useState(5) // 秒
-    const [isGreenScreen, setIsGreenScreen] = useState(false)
+    const [isAutoExpression, setIsAutoExpression] = useState(initialSettings.isAutoExpression)
+    const [expressionInterval, setExpressionInterval] = useState(initialSettings.expressionInterval)
+    const [isGreenScreen, setIsGreenScreen] = useState(initialSettings.isGreenScreen)
+    const [theme, setTheme] = useState<ThemeType>(initialSettings.theme)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const frameIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const autoExpressionRef = useRef<NodeJS.Timeout | null>(null)
+
+    // テーマをHTMLに適用
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme)
+    }, [theme])
 
     // ウィンドウサイズを監視
     useEffect(() => {
@@ -59,6 +121,62 @@ function App(): JSX.Element {
         }
         window.addEventListener('resize', handleResize)
         return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    // ホットリロード日時
+    const [reloadTime] = useState(() => {
+        const now = new Date()
+        return `${now.getMonth() + 1}/${now.getDate()} ${now.toLocaleTimeString('ja-JP')}`
+    })
+
+    // 設定を自動保存
+    useEffect(() => {
+        const settings: AppSettings = {
+            lastVrmPath,
+            lastBackgroundPath,
+            cameraPreset,
+            isLipSyncEnabled,
+            isAutoExpression,
+            expressionInterval,
+            isGreenScreen,
+            outputSize,
+            colorAdjustment,
+            theme
+        }
+        saveSettings(settings)
+    }, [lastVrmPath, lastBackgroundPath, cameraPreset, isLipSyncEnabled, isAutoExpression, expressionInterval, isGreenScreen, outputSize, colorAdjustment, theme])
+
+    // ファイルパスからVRMを読み込む
+    const loadVrmFromPath = useCallback(async (filePath: string) => {
+        try {
+            const buffer = await window.api.file.readAsBuffer(filePath)
+            if (buffer) {
+                const blob = new Blob([buffer], { type: 'application/octet-stream' })
+                const url = URL.createObjectURL(blob)
+                setVrmUrl(url)
+                setLastVrmPath(filePath)
+            }
+        } catch (error) {
+            console.error('Failed to load VRM:', error)
+            // ファイルが見つからない場合はパスをクリア
+            setLastVrmPath(null)
+        }
+    }, [])
+
+    // ファイルパスから背景を読み込む
+    const loadBackgroundFromPath = useCallback(async (filePath: string) => {
+        try {
+            const buffer = await window.api.file.readAsBuffer(filePath)
+            if (buffer) {
+                const blob = new Blob([buffer], { type: 'image/*' })
+                const url = URL.createObjectURL(blob)
+                setBackgroundImage(url)
+                setLastBackgroundPath(filePath)
+            }
+        } catch (error) {
+            console.error('Failed to load background:', error)
+            setLastBackgroundPath(null)
+        }
     }, [])
 
     // 自動ループする表情のリスト（通常、笑顔、リラックス）
@@ -268,18 +386,51 @@ function App(): JSX.Element {
     return (
         <div className="app">
             <header className="app-header">
-                <h1>リアライズ</h1>
-                <p className="subtitle">VRM仮想カメラ</p>
+                <div className="header-logo">
+                    <img src={logoImage} alt="Project Realize" className="logo-image" />
+                </div>
                 <div className="resolution-info">
+                    <span className="resolution-badge loc">
+                        📝 {LOC_COUNT} LoC
+                    </span>
+                    <span className="resolution-badge reload">
+                        🔄 {reloadTime}
+                    </span>
                     <span className="resolution-badge window">
                         🖥️ {windowSize.width}x{windowSize.height}
                     </span>
                     <span className="resolution-badge preview">
-                        👁️ プレビュー: {previewSize.width}x{previewSize.height}
+                        👁️ {previewSize.width}x{previewSize.height}
                     </span>
                     <span className={`resolution-badge output ${isVirtualCameraOn ? 'active' : ''}`}>
-                        🎥 出力: {outputSize}
+                        🎥 {outputSize}
                     </span>
+                    <div className="theme-selector">
+                        <button
+                            className={`theme-btn ${theme === 'dark-rum' ? 'active' : ''}`}
+                            data-theme="dark-rum"
+                            onClick={() => setTheme('dark-rum')}
+                            title="ダークラム"
+                        />
+                        <button
+                            className={`theme-btn ${theme === 'white-liquor' ? 'active' : ''}`}
+                            data-theme="white-liquor"
+                            onClick={() => setTheme('white-liquor')}
+                            title="ホワイトリーカー"
+                        />
+                        <button
+                            className={`theme-btn ${theme === 'wine-red' ? 'active' : ''}`}
+                            data-theme="wine-red"
+                            onClick={() => setTheme('wine-red')}
+                            title="ワインレッド"
+                        />
+                        <button
+                            className={`theme-btn ${theme === 'sherry-cask' ? 'active' : ''}`}
+                            data-theme="sherry-cask"
+                            onClick={() => setTheme('sherry-cask')}
+                            title="シェリーカスク"
+                        />
+                    </div>
                 </div>
             </header>
 
@@ -348,7 +499,15 @@ function App(): JSX.Element {
                         </div>
                     </>
                 ) : (
-                    <DropZone onFileDrop={handleFileDrop} />
+                    <DropZone
+                        onFileDrop={handleFileDrop}
+                        lastVrmPath={lastVrmPath}
+                        onLoadLastVrm={() => {
+                            if (lastVrmPath) {
+                                loadVrmFromPath(lastVrmPath)
+                            }
+                        }}
+                    />
                 )}
             </main>
 

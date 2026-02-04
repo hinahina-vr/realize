@@ -1,4 +1,5 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawn, ChildProcess } from 'child_process'
@@ -217,6 +218,41 @@ app.whenReady().then(() => {
 
   ipcMain.handle('virtual-camera:is-ready', () => {
     return isVirtualCameraReady
+  })
+
+  // ファイルダイアログ: VRM選択
+  ipcMain.handle('dialog:openVrm', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'VRM Files', extensions: ['vrm'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return result.filePaths[0]
+  })
+
+  // ファイルダイアログ: 画像選択
+  ipcMain.handle('dialog:openImage', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return result.filePaths[0]
+  })
+
+  // ファイル読み込み
+  ipcMain.handle('file:readAsBuffer', async (_, filePath: string) => {
+    try {
+      const buffer = await readFile(filePath)
+      return buffer
+    } catch (error) {
+      console.error('Failed to read file:', error)
+      return null
+    }
   })
 
   createWindow()

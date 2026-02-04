@@ -17,9 +17,28 @@ const virtualCameraAPI = {
   }
 }
 
+// Dialog API
+const dialogAPI = {
+  openVrm: (): Promise<string | null> => {
+    return ipcRenderer.invoke('dialog:openVrm')
+  },
+  openImage: (): Promise<string | null> => {
+    return ipcRenderer.invoke('dialog:openImage')
+  }
+}
+
+// File API
+const fileAPI = {
+  readAsBuffer: (filePath: string): Promise<Buffer | null> => {
+    return ipcRenderer.invoke('file:readAsBuffer', filePath)
+  }
+}
+
 // Custom APIs for renderer
 const api = {
-  virtualCamera: virtualCameraAPI
+  virtualCamera: virtualCameraAPI,
+  dialog: dialogAPI,
+  file: fileAPI
 }
 
 if (process.contextIsolated) {

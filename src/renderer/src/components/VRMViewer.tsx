@@ -164,7 +164,7 @@ function VRMModel({
                 }
             },
             undefined,
-            (error) => {
+            (error: unknown) => {
                 console.error('Error loading animation:', error)
             }
         )

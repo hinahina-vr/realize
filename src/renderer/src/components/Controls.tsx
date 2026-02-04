@@ -253,8 +253,8 @@ export function Controls({
                     {isVirtualCameraConnecting
                         ? '⏳ 接続中...'
                         : isVirtualCameraOn
-                            ? '🔴 配信停止'
-                            : '🎥 配信開始'}
+                            ? '🔴 仮想カメラ停止'
+                            : '🎥 仮想カメラ起動'}
                 </button>
             </div>
 
