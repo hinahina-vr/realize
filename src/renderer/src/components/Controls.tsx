@@ -144,6 +144,17 @@ export function Controls({
                     {t.vrmModel.replace}
                 </button>
             </div>
+            <div className="control-group">
+                {hasVrm && (
+                    <button
+                        className="control-button"
+                        onClick={onClearVrm}
+                        title="VRMモデルを非表示にする"
+                    >
+                        ⏹️ OFF
+                    </button>
+                )}
+            </div>
 
             <h3>{t.camera.title}</h3>
             <div className="control-group">
@@ -239,12 +250,37 @@ export function Controls({
                     🟢 {t.background.greenScreen}
                 </button>
             </div>
+            <div className="control-group">
+                {(backgroundImage || backgroundVideo) && (
+                    <button
+                        className="control-button"
+                        onClick={() => {
+                            onBackgroundChange(null)
+                            onBackgroundVideoChange(null)
+                        }}
+                        title="背景をクリア"
+                    >
+                        ⏹️ OFF
+                    </button>
+                )}
+            </div>
 
             <h3>{t.animation.title}</h3>
             <div className="control-group">
                 <button className="control-button" onClick={handleAnimationSelect} disabled={!hasVrm}>
                     📁 {t.animation.file}
                 </button>
+            </div>
+            <div className="control-group">
+                {animationUrl && (
+                    <button
+                        className="control-button"
+                        onClick={() => onAnimationChange(null)}
+                        title="アニメーションを停止"
+                    >
+                        ⏹️ OFF
+                    </button>
+                )}
             </div>
             <div className="control-group" />
 
