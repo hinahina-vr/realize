@@ -58,7 +58,7 @@ export const zh: Translations = {
         connecting: '连接中...'
     },
     expressions: {
-        neutral: '正常',
+        neutral: '自然',
         happy: '开心',
         angry: '生气',
         sad: '悲伤',

@@ -14,7 +14,7 @@ export const ko: Translations = {
     },
     camera: {
         title: '📷 카메라 위치',
-        bust: '상반신',
+        bust: '상체',
         full: '전신',
         face: '얼굴',
         save: '💾 저장',
@@ -59,7 +59,7 @@ export const ko: Translations = {
     },
     expressions: {
         neutral: '기본',
-        happy: '행복',
+        happy: '기쁨',
         angry: '화남',
         sad: '슬픔',
         relaxed: '편안',
