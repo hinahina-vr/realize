@@ -94,7 +94,7 @@ export function Controls({
             // ファイルをバッファとして読み込み
             const buffer = await window.api.file.readAsBuffer(filePath)
             if (buffer) {
-                const blob = new Blob([buffer], { type: 'image/*' })
+                const blob = new Blob([buffer.buffer as ArrayBuffer], { type: 'image/*' })
                 const file = new File([blob], filePath.split(/[/\\]/).pop() || 'background.png', { type: 'image/*' })
                 onBackgroundChange(file, filePath)
                 // 画像選択時はグリーンバックをOFFに

@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom, BrightnessContrast, HueSaturation } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRM, VRMExpressionPresetName } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, VRMAnimation, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
 import type { OutputSize } from '../App'
@@ -157,7 +157,7 @@ function VRMModel({
 
         loader.load(
             animationUrl,
-            (gltf) => {
+            (gltf: GLTF) => {
                 const vrmAnimation = gltf.userData.vrmAnimations?.[0] as VRMAnimation | undefined
                 if (vrmAnimation && mixerRef.current) {
                     // 現在のアニメーションを停止

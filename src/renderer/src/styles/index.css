@@ -249,10 +249,9 @@ body {
 }
 
 .vrm-viewer {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   width: 100%;
   max-width: 100%;
-  max-height: calc(100% - 50px);
   background: var(--bg-primary);
   overflow: hidden;
 }

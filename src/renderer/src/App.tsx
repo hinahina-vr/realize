@@ -196,7 +196,7 @@ function App(): JSX.Element {
         try {
             const buffer = await window.api.file.readAsBuffer(filePath)
             if (buffer) {
-                const blob = new Blob([buffer], { type: 'application/octet-stream' })
+                const blob = new Blob([buffer.buffer as ArrayBuffer], { type: 'application/octet-stream' })
                 const url = URL.createObjectURL(blob)
                 setVrmUrl(url)
                 setLastVrmPath(filePath)
@@ -213,7 +213,7 @@ function App(): JSX.Element {
         try {
             const buffer = await window.api.file.readAsBuffer(filePath)
             if (buffer) {
-                const blob = new Blob([buffer], { type: 'image/*' })
+                const blob = new Blob([buffer.buffer as ArrayBuffer], { type: 'image/*' })
                 const url = URL.createObjectURL(blob)
                 setBackgroundImage(url)
                 setLastBackgroundPath(filePath)

@@ -39,7 +39,7 @@ export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZonePro
             // ファイルをバッファとして読み込み
             const buffer = await window.api.file.readAsBuffer(filePath)
             if (buffer) {
-                const blob = new Blob([buffer], { type: 'application/octet-stream' })
+                const blob = new Blob([buffer.buffer as ArrayBuffer], { type: 'application/octet-stream' })
                 const file = new File([blob], filePath.split(/[/\\]/).pop() || 'model.vrm', { type: 'application/octet-stream' })
                 onFileDrop(file, filePath)
             }
