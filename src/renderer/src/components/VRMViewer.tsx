@@ -30,12 +30,14 @@ interface VRMViewerProps {
     isLipSyncEnabled: boolean
     selectedDeviceId: string
     backgroundImage?: string | null
+    backgroundVideo?: string | null
     isGreenScreen?: boolean
     outputSize: OutputSize
     animationUrl?: string | null
     expression?: ExpressionType
     colorAdjustment?: ColorAdjustment
     onPreviewSizeChange?: (size: { width: number; height: number }) => void
+    onFpsChange?: (fps: number) => void
     customCameraPosition?: {
         position: [number, number, number]
         target: [number, number, number]
@@ -442,17 +444,69 @@ function RenderSizeController({ width, height }: { width: number; height: number
     return null
 }
 
-function Background({ backgroundImage, isGreenScreen }: { backgroundImage?: string | null; isGreenScreen?: boolean }): JSX.Element | null {
+// FPSカウンター
+function FPSCounter({ onFpsChange }: { onFpsChange?: (fps: number) => void }): null {
+    const frameCount = useRef(0)
+    const lastTime = useRef(performance.now())
+
+    useFrame(() => {
+        frameCount.current++
+        const now = performance.now()
+        const delta = now - lastTime.current
+
+        // 1秒ごとにFPSを計算
+        if (delta >= 1000) {
+            const fps = Math.round((frameCount.current * 1000) / delta)
+            onFpsChange?.(fps)
+            frameCount.current = 0
+            lastTime.current = now
+        }
+    })
+
+    return null
+}
+
+function Background({ backgroundImage, backgroundVideo, isGreenScreen }: { backgroundImage?: string | null; backgroundVideo?: string | null; isGreenScreen?: boolean }): JSX.Element | null {
     const { scene, gl } = useThree()
+    const videoRef = useRef<HTMLVideoElement | null>(null)
+    const videoTextureRef = useRef<THREE.VideoTexture | null>(null)
 
     useEffect(() => {
         // 色補正を無効化
         gl.toneMapping = THREE.NoToneMapping
         gl.outputColorSpace = THREE.SRGBColorSpace
 
+        // 既存のビデオをクリーンアップ
+        if (videoRef.current) {
+            videoRef.current.pause()
+            videoRef.current.src = ''
+            videoRef.current = null
+        }
+        if (videoTextureRef.current) {
+            videoTextureRef.current.dispose()
+            videoTextureRef.current = null
+        }
+
         if (isGreenScreen) {
             // グリーンバック（クロマキー用緑色）
             scene.background = new THREE.Color(0x00ff00)
+        } else if (backgroundVideo) {
+            // 動画背景
+            const video = document.createElement('video')
+            video.src = backgroundVideo
+            video.loop = true
+            video.muted = true
+            video.playsInline = true
+            video.crossOrigin = 'anonymous'
+            video.play().catch(console.error)
+            videoRef.current = video
+
+            const videoTexture = new THREE.VideoTexture(video)
+            videoTexture.colorSpace = THREE.SRGBColorSpace
+            videoTexture.minFilter = THREE.LinearFilter
+            videoTexture.magFilter = THREE.LinearFilter
+            videoTextureRef.current = videoTexture
+            scene.background = videoTexture
         } else if (backgroundImage) {
             const loader = new THREE.TextureLoader()
             loader.load(backgroundImage, (texture) => {
@@ -465,9 +519,16 @@ function Background({ backgroundImage, isGreenScreen }: { backgroundImage?: stri
         }
 
         return () => {
+            if (videoRef.current) {
+                videoRef.current.pause()
+                videoRef.current.src = ''
+            }
+            if (videoTextureRef.current) {
+                videoTextureRef.current.dispose()
+            }
             scene.background = new THREE.Color(0x1a1a2e)
         }
-    }, [backgroundImage, isGreenScreen, scene, gl])
+    }, [backgroundImage, backgroundVideo, isGreenScreen, scene, gl])
 
     return null
 }
@@ -478,12 +539,14 @@ export function VRMViewer({
     isLipSyncEnabled,
     selectedDeviceId,
     backgroundImage,
+    backgroundVideo,
     isGreenScreen,
     outputSize,
     animationUrl,
     expression,
     colorAdjustment,
     onPreviewSizeChange,
+    onFpsChange,
     customCameraPosition,
     cameraRef
 }: VRMViewerProps): JSX.Element {
@@ -564,7 +627,8 @@ export function VRMViewer({
                 <directionalLight position={[1, 1, 1]} intensity={0.8 * brightnessMultiplier} />
                 <directionalLight position={[-1, 1, -1]} intensity={0.4 * brightnessMultiplier} />
 
-                <Background backgroundImage={backgroundImage} isGreenScreen={isGreenScreen} />
+                <FPSCounter onFpsChange={onFpsChange} />
+                <Background backgroundImage={backgroundImage} backgroundVideo={backgroundVideo} isGreenScreen={isGreenScreen} />
                 <VRMModel
                     vrmUrl={vrmUrl}
                     isLipSyncEnabled={isLipSyncEnabled}

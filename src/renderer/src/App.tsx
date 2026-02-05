@@ -2,10 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { VRMViewer } from './components/VRMViewer'
 import { DropZone } from './components/DropZone'
 import { Controls } from './components/Controls'
+import { getTranslation, languageFlags, type Language } from './i18n'
 import logoImage from './assets/logo.png'
 
 // LoC (ビルド時に固定)
-const LOC_COUNT = 1602
+const LOC_COUNT = 2930
 
 interface AudioDevice {
     deviceId: string
@@ -49,6 +50,16 @@ export interface AppSettings {
         full?: { position: [number, number, number]; target: [number, number, number] }
         face?: { position: [number, number, number]; target: [number, number, number] }
     }
+    language: Language
+}
+
+// ブラウザのロケールから言語を自動検出
+function detectLanguage(): Language {
+    const browserLang = navigator.language.toLowerCase()
+    if (browserLang.startsWith('ja')) return 'ja'
+    if (browserLang.startsWith('ko')) return 'ko'
+    if (browserLang.startsWith('zh')) return 'zh'
+    return 'en' // デフォルトは英語
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -62,7 +73,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     outputSize: '1280x720',
     colorAdjustment: { brightness: 0, contrast: 0, saturation: 0 },
     theme: 'dark-rum',
-    customCameraPositions: {}
+    customCameraPositions: {},
+    language: detectLanguage()
 }
 
 const SETTINGS_KEY = 'realize_settings'
@@ -98,6 +110,7 @@ function App(): JSX.Element {
     const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([])
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null)
+    const [backgroundVideo, setBackgroundVideo] = useState<string | null>(null)
     const [lastBackgroundPath, setLastBackgroundPath] = useState<string | null>(initialSettings.lastBackgroundPath)
     const [outputSize, setOutputSize] = useState<OutputSize>(initialSettings.outputSize)
     const [isVirtualCameraOn, setIsVirtualCameraOn] = useState(false)
@@ -116,6 +129,9 @@ function App(): JSX.Element {
         full?: { position: [number, number, number]; target: [number, number, number] }
         face?: { position: [number, number, number]; target: [number, number, number] }
     }>(initialSettings.customCameraPositions || {})
+    const [fps, setFps] = useState(0)
+    const [language, setLanguage] = useState<Language>(initialSettings.language)
+    const t = getTranslation(language)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const frameIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const autoExpressionRef = useRef<NodeJS.Timeout | null>(null)
@@ -169,10 +185,11 @@ function App(): JSX.Element {
             outputSize,
             colorAdjustment,
             theme,
-            customCameraPositions
+            customCameraPositions,
+            language
         }
         saveSettings(settings)
-    }, [lastVrmPath, lastBackgroundPath, cameraPreset, isLipSyncEnabled, isAutoExpression, expressionInterval, isGreenScreen, outputSize, colorAdjustment, theme, customCameraPositions])
+    }, [lastVrmPath, lastBackgroundPath, cameraPreset, isLipSyncEnabled, isAutoExpression, expressionInterval, isGreenScreen, outputSize, colorAdjustment, theme, customCameraPositions, language])
 
     // ファイルパスからVRMを読み込む
     const loadVrmFromPath = useCallback(async (filePath: string) => {
@@ -396,6 +413,11 @@ function App(): JSX.Element {
             if (backgroundImage) {
                 URL.revokeObjectURL(backgroundImage)
             }
+            // 画像選択時は動画をクリア
+            if (backgroundVideo) {
+                URL.revokeObjectURL(backgroundVideo)
+                setBackgroundVideo(null)
+            }
             if (file) {
                 const url = URL.createObjectURL(file)
                 setBackgroundImage(url)
@@ -408,7 +430,27 @@ function App(): JSX.Element {
                 setLastBackgroundPath(null)
             }
         },
-        [backgroundImage]
+        [backgroundImage, backgroundVideo]
+    )
+
+    const handleBackgroundVideoChange = useCallback(
+        (file: File | null) => {
+            // 動画選択時は画像をクリア
+            if (backgroundImage) {
+                URL.revokeObjectURL(backgroundImage)
+                setBackgroundImage(null)
+            }
+            if (backgroundVideo) {
+                URL.revokeObjectURL(backgroundVideo)
+            }
+            if (file) {
+                const url = URL.createObjectURL(file)
+                setBackgroundVideo(url)
+            } else {
+                setBackgroundVideo(null)
+            }
+        },
+        [backgroundImage, backgroundVideo]
     )
 
     const handleAnimationChange = useCallback(
@@ -431,6 +473,10 @@ function App(): JSX.Element {
             <header className="app-header">
                 <div className="header-logo">
                     <img src={logoImage} alt="Project Realize" className="logo-image" />
+                </div>
+                <div className="header-info">
+                    <span className="size-badge">📺 {windowSize.width}×{windowSize.height}</span>
+                    <span className="fps-badge">⚡ {fps} FPS</span>
                 </div>
                 <div className="resolution-info">
                     <span className="resolution-badge loc">
@@ -475,6 +521,18 @@ function App(): JSX.Element {
                         />
                     </div>
                 </div>
+                <div className="language-switcher">
+                    {(['ja', 'en', 'zh', 'ko'] as Language[]).map((lang) => (
+                        <button
+                            key={lang}
+                            className={`lang-btn ${language === lang ? 'active' : ''}`}
+                            onClick={() => setLanguage(lang)}
+                            title={lang.toUpperCase()}
+                        >
+                            {languageFlags[lang]}
+                        </button>
+                    ))}
+                </div>
             </header>
 
             <main className="app-main">
@@ -486,12 +544,14 @@ function App(): JSX.Element {
                             isLipSyncEnabled={isLipSyncEnabled}
                             selectedDeviceId={selectedDeviceId}
                             backgroundImage={backgroundImage}
+                            backgroundVideo={backgroundVideo}
                             isGreenScreen={isGreenScreen}
                             outputSize={outputSize}
                             animationUrl={animationUrl}
                             expression={currentExpression}
                             colorAdjustment={colorAdjustment}
                             onPreviewSizeChange={setPreviewSize}
+                            onFpsChange={setFps}
                             customCameraPosition={customCameraPositions[cameraPreset] || null}
                             cameraRef={cameraRef}
                         />
@@ -567,6 +627,8 @@ function App(): JSX.Element {
                     onDeviceChange={setSelectedDeviceId}
                     backgroundImage={backgroundImage}
                     onBackgroundChange={handleBackgroundChange}
+                    backgroundVideo={backgroundVideo}
+                    onBackgroundVideoChange={handleBackgroundVideoChange}
                     outputSize={outputSize}
                     onOutputSizeChange={setOutputSize}
                     isVirtualCameraOn={isVirtualCameraOn}
@@ -598,6 +660,7 @@ function App(): JSX.Element {
                         delete newPositions[cameraPreset]
                         return newPositions
                     })}
+                    t={t}
                 />
             </aside>
 

@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import type { OutputSize, ColorAdjustment, ExpressionType } from '../App'
+import type { Translations } from '../i18n'
 
 interface AudioDevice {
     deviceId: string
@@ -16,6 +17,8 @@ interface ControlsProps {
     onDeviceChange: (deviceId: string) => void
     backgroundImage: string | null
     onBackgroundChange: (file: File | null, filePath?: string | null) => void
+    backgroundVideo: string | null
+    onBackgroundVideoChange: (file: File | null) => void
     isGreenScreen: boolean
     onGreenScreenToggle: () => void
     outputSize: OutputSize
@@ -38,6 +41,7 @@ interface ControlsProps {
     onSaveCameraPosition?: () => void
     hasCustomCameraPosition?: boolean
     onResetCameraPosition?: () => void
+    t: Translations
 }
 
 const OUTPUT_SIZES: { value: OutputSize; label: string }[] = [
@@ -57,6 +61,8 @@ export function Controls({
     onDeviceChange,
     backgroundImage,
     onBackgroundChange,
+    backgroundVideo,
+    onBackgroundVideoChange,
     isGreenScreen,
     onGreenScreenToggle,
     outputSize,
@@ -78,7 +84,8 @@ export function Controls({
     onExpressionIntervalChange,
     onSaveCameraPosition,
     hasCustomCameraPosition,
-    onResetCameraPosition
+    onResetCameraPosition,
+    t
 }: ControlsProps): JSX.Element {
     const handleBackgroundSelect = useCallback(async () => {
         // Electronのダイアログを使用してパスを確実に取得
@@ -111,35 +118,52 @@ export function Controls({
         input.click()
     }, [onAnimationChange])
 
+    const handleVideoSelect = useCallback(() => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'video/mp4,video/webm,video/ogg'
+        input.onchange = (e) => {
+            const files = (e.target as HTMLInputElement).files
+            if (files && files.length > 0) {
+                onBackgroundVideoChange(files[0])
+                // 動画選択時はグリーンバックをOFFに
+                if (isGreenScreen) {
+                    onGreenScreenToggle()
+                }
+            }
+        }
+        input.click()
+    }, [onBackgroundVideoChange, isGreenScreen, onGreenScreenToggle])
+
     return (
         <div className="controls">
 
-            <h3>👤 VRMモデル</h3>
+            <h3>{t.vrmModel.title}</h3>
             <div className="control-group">
                 <button className="control-button" onClick={onClearVrm}>
-                    🔄 入れ替え
+                    {t.vrmModel.replace}
                 </button>
             </div>
 
-            <h3>📷 カメラ位置</h3>
+            <h3>{t.camera.title}</h3>
             <div className="control-group">
                 <button
                     className={`control-button ${cameraPreset === 'bust' ? 'active' : ''}`}
                     onClick={() => onCameraPresetChange('bust')}
                 >
-                    バストアップ
+                    {t.camera.bust}
                 </button>
                 <button
                     className={`control-button ${cameraPreset === 'full' ? 'active' : ''}`}
                     onClick={() => onCameraPresetChange('full')}
                 >
-                    全身
+                    {t.camera.full}
                 </button>
                 <button
                     className={`control-button ${cameraPreset === 'face' ? 'active' : ''}`}
                     onClick={() => onCameraPresetChange('face')}
                 >
-                    顔アップ
+                    {t.camera.face}
                 </button>
             </div>
             <div className="control-group camera-memory-group">
@@ -147,45 +171,43 @@ export function Controls({
                     <button
                         className="control-button save-camera-btn"
                         onClick={onSaveCameraPosition}
-                        title="現在のカメラ位置を記憶"
                     >
-                        💾 位置記憶
+                        {t.camera.save}
                     </button>
                 )}
                 {hasCustomCameraPosition && onResetCameraPosition && (
                     <button
                         className="control-button reset-camera-btn"
                         onClick={onResetCameraPosition}
-                        title="記憶したカメラ位置をクリア"
                     >
-                        🗑️ リセット
+                        {t.camera.reset}
                     </button>
                 )}
             </div>
 
-            <h3>🎤 リップシンク</h3>
+            <h3>{t.lipSync.title}</h3>
             <div className="control-group">
                 <button
                     className={`control-button toggle ${isLipSyncEnabled ? 'active' : ''}`}
                     onClick={onLipSyncToggle}
                 >
-                    {isLipSyncEnabled ? '🔊 ON' : '🔇 OFF'}
+                    {isLipSyncEnabled ? `🔊 ${t.lipSync.on}` : `🔇 ${t.lipSync.off}`}
                 </button>
             </div>
             <div className="control-group" />
 
-            <h3>✨ 自動表情</h3>
+            <h3>{t.autoExpression.title}</h3>
             <div className="control-group">
                 <button
                     className={`control-button toggle ${isAutoExpression ? 'active' : ''}`}
                     onClick={onAutoExpressionToggle}
                 >
-                    {isAutoExpression ? '🔄 ON' : '⏸️ OFF'}
+                    {isAutoExpression ? `🔄 ${t.autoExpression.on}` : `⏸️ ${t.autoExpression.off}`}
                 </button>
             </div>
             <div className="control-group" style={{ opacity: isAutoExpression ? 1 : 0.3 }}>
                 <div className="slider-group compact">
-                    <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>{expressionInterval}秒</span>
+                    <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>{expressionInterval}s</span>
                     <input
                         type="range"
                         className="control-slider"
@@ -198,10 +220,15 @@ export function Controls({
                 </div>
             </div>
 
-            <h3>🖼️ 背景</h3>
+            <h3>{t.background.title}</h3>
             <div className="control-group">
                 <button className="control-button" onClick={handleBackgroundSelect}>
-                    {backgroundImage ? '🔄 画像' : '📁 画像'}
+                    📁 {t.background.image}
+                </button>
+            </div>
+            <div className="control-group">
+                <button className="control-button" onClick={handleVideoSelect}>
+                    🎬 {t.background.video}
                 </button>
             </div>
             <div className="control-group">
@@ -209,19 +236,19 @@ export function Controls({
                     className={`control-button ${isGreenScreen ? 'active' : ''}`}
                     onClick={onGreenScreenToggle}
                 >
-                    🟢 GB
+                    🟢 {t.background.greenScreen}
                 </button>
             </div>
 
-            <h3>💃 アニメーション</h3>
+            <h3>{t.animation.title}</h3>
             <div className="control-group">
                 <button className="control-button" onClick={handleAnimationSelect} disabled={!hasVrm}>
-                    {animationUrl ? '🔄 アニメ' : '📁 .vrma'}
+                    📁 {t.animation.file}
                 </button>
             </div>
             <div className="control-group" />
 
-            <h3>📐 出力 / 🎙️ マイク</h3>
+            <h3>{t.outputMic.title}</h3>
             <div className="control-group">
                 <select
                     className="control-select"
@@ -254,7 +281,7 @@ export function Controls({
                 </select>
             </div>
 
-            <h3>☀️ 明るさ</h3>
+            <h3>☀️ {t.colorAdjustment.brightness}</h3>
             <div className="control-group slider-group">
                 <input
                     type="range"
@@ -278,10 +305,10 @@ export function Controls({
                     title="OBS Virtual Cameraを使用して配信ソフトに映像を送信します"
                 >
                     {isVirtualCameraConnecting
-                        ? '⏳ 接続中...'
+                        ? `⏳ ${t.virtualCamera.connecting}`
                         : isVirtualCameraOn
-                            ? '🔴 仮想カメラ停止'
-                            : '🎥 仮想カメラ起動'}
+                            ? t.virtualCamera.stop
+                            : t.virtualCamera.start}
                 </button>
             </div>
 

@@ -80,6 +80,14 @@ function actuallyStartVirtualCamera(
 
   console.log('Starting virtual camera:', scriptPath)
 
+  let resolved = false
+  const safeResolve = (value: boolean): void => {
+    if (!resolved) {
+      resolved = true
+      resolve(value)
+    }
+  }
+
   const proc = spawn('python', [scriptPath, width.toString(), height.toString(), fps.toString()])
   virtualCameraProcess = proc
 
@@ -93,7 +101,7 @@ function actuallyStartVirtualCamera(
     console.log('Virtual camera:', message)
     if (message === 'READY' && virtualCameraProcess === proc) {
       isVirtualCameraReady = true
-      resolve(true)
+      safeResolve(true)
     }
   })
 
@@ -108,6 +116,8 @@ function actuallyStartVirtualCamera(
       virtualCameraProcess = null
       isVirtualCameraReady = false
     }
+    // クローズ時にまだresolveされていなければfalseで解決
+    safeResolve(false)
   })
 
   proc.on('error', (err) => {
@@ -116,14 +126,14 @@ function actuallyStartVirtualCamera(
       virtualCameraProcess = null
       isVirtualCameraReady = false
     }
-    resolve(false)
+    safeResolve(false)
   })
 
   // タイムアウト
   setTimeout(() => {
     if (!isVirtualCameraReady && virtualCameraProcess === proc) {
       console.error('Virtual camera startup timeout')
-      resolve(false)
+      safeResolve(false)
     }
   }, 10000)
 }

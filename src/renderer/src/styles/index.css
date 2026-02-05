@@ -178,6 +178,44 @@ body {
   background: linear-gradient(135deg, #4a3318, #d4a574);
 }
 
+/* 言語切替ボタン */
+.language-switcher {
+  display: flex;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  margin-left: 8px;
+}
+
+.lang-btn {
+  min-width: 32px;
+  height: 24px;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.lang-btn:hover {
+  background: var(--bg-secondary);
+  transform: scale(1.1);
+}
+
+.lang-btn.active {
+  border-color: var(--accent-color);
+  background: rgba(var(--accent-color-rgb), 0.2);
+  box-shadow: 0 0 8px rgba(var(--accent-color-rgb), 0.4);
+}
 
 .resolution-badge {
   padding: 3px 8px;
@@ -281,6 +319,11 @@ body {
   color: var(--text-secondary);
   margin-bottom: 1px;
   margin-top: 6px;
+  min-height: 14px;
+  line-height: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .controls h3:first-child {
@@ -299,6 +342,7 @@ body {
 
 .control-button {
   padding: 6px 8px;
+  min-height: 28px;
   background: var(--bg-tertiary);
   border: none;
   border-radius: 4px;
