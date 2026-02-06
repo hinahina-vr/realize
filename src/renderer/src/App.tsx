@@ -83,7 +83,13 @@ function loadSettings(): AppSettings {
     try {
         const saved = localStorage.getItem(SETTINGS_KEY)
         if (saved) {
-            return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
+            const parsed = JSON.parse(saved)
+            // outputSizeが有効な値かチェック（1440pは削除されたため無効）
+            const validOutputSizes = ['1920x1080', '1280x720', '960x540', '640x360']
+            if (parsed.outputSize && !validOutputSizes.includes(parsed.outputSize)) {
+                parsed.outputSize = DEFAULT_SETTINGS.outputSize
+            }
+            return { ...DEFAULT_SETTINGS, ...parsed }
         }
     } catch (e) {
         console.error('Failed to load settings:', e)

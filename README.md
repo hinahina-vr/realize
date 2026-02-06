@@ -45,39 +45,50 @@
 
 ## 🚀 クイックスタート
 
-### 必要環境
+### Windows版 インストール（推奨）
+
+1. **インストーラーをダウンロード**
+   - `realize-1.0.0-setup.exe` をダウンロードして実行
+
+2. **仮想カメラを登録**（管理者権限が必要・初回のみ）
+   ```powershell
+   # 管理者としてPowerShellを開いて実行
+   regsvr32 "C:\Program Files\realize\resources\vcam-service.dll"
+   ```
+
+3. **アプリを起動**
+   - スタートメニューから「Realize」を起動
+
+4. **Zoom/Teams/Meetで使用**
+   - カメラ設定で「**Hinahina Virtual Camera**」を選択
+
+---
+
+### 開発者向け（ソースからビルド）
+
+#### 必要環境
 
 - Node.js 18+
-- Python 3.10+（仮想カメラ用）
-- OBS Studio（仮想カメラドライバ）
+- Windows 10/11（仮想カメラはWindows専用）
 
-### インストール
+#### インストール
 
 ```bash
 # 依存関係のインストール
 npm install
-
-# Python仮想カメラブリッジの準備
-pip install pyvirtualcam opencv-python numpy
 ```
 
-### 開発
+#### 開発
 
 ```bash
 npm run dev
 ```
 
-### ビルド
+#### ビルド
 
 ```bash
 # Windows
 npm run build:win
-
-# macOS
-npm run build:mac
-
-# Linux
-npm run build:linux
 ```
 
 ---
@@ -145,8 +156,29 @@ realize/
 | UI | React 18 + TypeScript |
 | 3D描画 | Three.js + @react-three/fiber |
 | VRM処理 | @pixiv/three-vrm |
-| 仮想カメラ | pyvirtualcam (Python) |
+| 仮想カメラ | vcam-napi (DirectShow, Windows専用) |
 | スタイリング | Vanilla CSS (Glassmorphism) |
+
+---
+
+## ❓ トラブルシューティング
+
+### 仮想カメラが表示されない
+
+1. 管理者権限でDLLを登録してください：
+   ```powershell
+   regsvr32 "C:\Program Files\realize\resources\vcam-service.dll"
+   ```
+
+2. PCを再起動してください
+
+### 画面が真っ暗
+
+- VRMファイルをドラッグ＆ドロップしてください
+
+### Zoomで色がおかしい
+
+- 出力解像度を「720p」または「1080p」に設定してください
 
 ---
 
