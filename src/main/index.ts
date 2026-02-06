@@ -2,21 +2,23 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { spawn, ChildProcess } from 'child_process'
 import icon from '../../resources/icon.png?asset'
 
-// グローバルなuncaughtExceptionハンドラ（write EOFエラーを無視）
+// vcam-napi - ネイティブ仮想カメラモジュール
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const VCam = require('vcam-napi')
+
+// グローバルなuncaughtExceptionハンドラ
 process.on('uncaughtException', (err) => {
-  if (err.message.includes('write EOF') || err.message.includes('EPIPE')) {
-    console.log('Ignored stream error:', err.message)
-    return
-  }
   console.error('Uncaught exception:', err)
-  // 他のエラーは再スローするか、アプリを終了
 })
 
-let virtualCameraProcess: ChildProcess | null = null
+// 仮想カメラインスタンス
+let virtualCamera: InstanceType<typeof VCam> | null = null
 let isVirtualCameraReady = false
+let currentWidth = 1280
+let currentHeight = 720
+let nv12BufferSize = 0
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -48,157 +50,137 @@ function createWindow(): void {
   }
 }
 
-// 仮想カメラを開始
-function startVirtualCamera(width: number, height: number, fps: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    // 既存のプロセスがある場合は停止してから開始
-    if (virtualCameraProcess) {
-      console.log('Stopping existing virtual camera before restart')
-      stopVirtualCamera()
-      // 古いプロセスが終了するまで待つ
-      setTimeout(() => {
-        actuallyStartVirtualCamera(width, height, fps, resolve)
-      }, 500)
-      return
-    }
+// RGBA → NV12 変換 (BT.601 Limited Range)
+// NV12: Y plane (width * height) + UV interleaved plane (width * height / 2)
+// Limited Range: Y [16-235], UV [16-240]
+function rgbaToNv12(rgbaData: Buffer, width: number, height: number): Buffer {
+  const ySize = width * height
+  const uvSize = (width * height) / 2
+  const nv12Buffer = Buffer.alloc(ySize + uvSize)
 
-    actuallyStartVirtualCamera(width, height, fps, resolve)
-  })
-}
+  // Y plane (BT.601 Limited Range: 16 + 219 * (0.299*R + 0.587*G + 0.114*B) / 255)
+  for (let i = 0; i < width * height; i++) {
+    const r = rgbaData[i * 4]
+    const g = rgbaData[i * 4 + 1]
+    const b = rgbaData[i * 4 + 2]
+    // BT.601 Limited Range Y値
+    const yFloat = 0.299 * r + 0.587 * g + 0.114 * b
+    const yLimited = 16 + (219 * yFloat) / 255
+    nv12Buffer[i] = Math.max(16, Math.min(235, Math.round(yLimited)))
+  }
 
-// 実際に仮想カメラを開始
-function actuallyStartVirtualCamera(
-  width: number,
-  height: number,
-  fps: number,
-  resolve: (value: boolean) => void
-): void {
-  // 開発モードではプロジェクトルートからの相対パス
-  const scriptPath = is.dev
-    ? join(app.getAppPath(), 'scripts/virtual_camera_bridge.py')
-    : join(process.resourcesPath, 'scripts/virtual_camera_bridge.py')
-
-  console.log('Starting virtual camera:', scriptPath)
-
-  let resolved = false
-  const safeResolve = (value: boolean): void => {
-    if (!resolved) {
-      resolved = true
-      resolve(value)
+  // UV plane (interleaved, 2x2 subsampling)
+  // NV12: U-V interleaved, Limited Range
+  let uvIndex = ySize
+  for (let y = 0; y < height; y += 2) {
+    for (let x = 0; x < width; x += 2) {
+      // 2x2ブロックの平均を取る
+      let rSum = 0, gSum = 0, bSum = 0
+      for (let dy = 0; dy < 2 && (y + dy) < height; dy++) {
+        for (let dx = 0; dx < 2 && (x + dx) < width; dx++) {
+          const px = ((y + dy) * width + (x + dx)) * 4
+          rSum += rgbaData[px]
+          gSum += rgbaData[px + 1]
+          bSum += rgbaData[px + 2]
+        }
+      }
+      const r = rSum / 4
+      const g = gSum / 4
+      const b = bSum / 4
+      // U (Cb) Limited Range: 128 + 224 * (-0.169*R - 0.331*G + 0.5*B) / 255
+      const uFloat = -0.168736 * r - 0.331264 * g + 0.5 * b
+      const uLimited = 128 + (224 * uFloat) / 255
+      nv12Buffer[uvIndex++] = Math.max(16, Math.min(240, Math.round(uLimited)))
+      // V (Cr) Limited Range: 128 + 224 * (0.5*R - 0.419*G - 0.081*B) / 255
+      const vFloat = 0.5 * r - 0.418688 * g - 0.081312 * b
+      const vLimited = 128 + (224 * vFloat) / 255
+      nv12Buffer[uvIndex++] = Math.max(16, Math.min(240, Math.round(vLimited)))
     }
   }
 
-  const proc = spawn('python', [scriptPath, width.toString(), height.toString(), fps.toString()])
-  virtualCameraProcess = proc
+  return nv12Buffer
+}
 
-  // stdinのエラーをキャッチ（write EOFを防ぐ - uncaughtにしない）
-  proc.stdin?.on('error', (err) => {
-    console.log('stdin error (expected on close):', err.message)
-  })
+// 仮想カメラを開始
+function startVirtualCamera(width: number, height: number, _fps: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      // 既存のインスタンスがあれば停止
+      if (virtualCamera) {
+        try {
+          virtualCamera.stop()
+        } catch (e) {
+          // ignore
+        }
+        virtualCamera = null
+      }
 
-  proc.stdout?.on('data', (data) => {
-    const message = data.toString().trim()
-    console.log('Virtual camera:', message)
-    if (message === 'READY' && virtualCameraProcess === proc) {
+      // 新しいインスタンスを作成
+      virtualCamera = new VCam()
+
+      // NV12レイアウトを取得
+      const layout = virtualCamera.get_nv12_layout(width, height)
+      nv12BufferSize = layout.size
+      currentWidth = width
+      currentHeight = height
+
+      // 仮想カメラを開始
+      virtualCamera.start(width, height)
       isVirtualCameraReady = true
-      safeResolve(true)
-    }
-  })
 
-  proc.stderr?.on('data', (data) => {
-    console.error('Virtual camera error:', data.toString())
-  })
-
-  proc.on('close', (code) => {
-    console.log('Virtual camera process exited with code:', code)
-    // 現在のプロセスの場合のみリセット
-    if (virtualCameraProcess === proc) {
-      virtualCameraProcess = null
+      console.log(`Virtual camera started: ${width}x${height}, NV12 buffer size: ${nv12BufferSize}`)
+      resolve(true)
+    } catch (error) {
+      console.error('Failed to start virtual camera:', error)
+      virtualCamera = null
       isVirtualCameraReady = false
+      resolve(false)
     }
-    // クローズ時にまだresolveされていなければfalseで解決
-    safeResolve(false)
   })
-
-  proc.on('error', (err) => {
-    console.error('Failed to start virtual camera:', err)
-    if (virtualCameraProcess === proc) {
-      virtualCameraProcess = null
-      isVirtualCameraReady = false
-    }
-    safeResolve(false)
-  })
-
-  // タイムアウト
-  setTimeout(() => {
-    if (!isVirtualCameraReady && virtualCameraProcess === proc) {
-      console.error('Virtual camera startup timeout')
-      safeResolve(false)
-    }
-  }, 10000)
 }
 
 // 仮想カメラを停止
 function stopVirtualCamera(): void {
-  if (virtualCameraProcess) {
-    const proc = virtualCameraProcess
-    virtualCameraProcess = null // 先にnullにして新しいフレーム送信を防ぐ
-    isVirtualCameraReady = false
-
-    // stdinを安全に閉じる
+  if (virtualCamera) {
     try {
-      if (proc.stdin && !proc.stdin.destroyed) {
-        proc.stdin.end()
-      }
+      virtualCamera.stop()
     } catch (e) {
-      // エラーは無視
+      console.error('Error stopping virtual camera:', e)
     }
-
-    // 少し待ってからkill
-    setTimeout(() => {
-      try {
-        if (!proc.killed) {
-          proc.kill('SIGTERM')
-        }
-      } catch (e) {
-        // エラーは無視
-      }
-    }, 200)
+    virtualCamera = null
+    isVirtualCameraReady = false
+    console.log('Virtual camera stopped')
   }
 }
 
 // フレームを送信
 let frameCounter = 0
 function sendFrame(frameData: Buffer): boolean {
-  if (!virtualCameraProcess || !isVirtualCameraReady) {
-    return false
-  }
-
-  if (!virtualCameraProcess.stdin || virtualCameraProcess.stdin.destroyed) {
-    console.error('sendFrame: stdin is not available or destroyed')
-    isVirtualCameraReady = false
+  if (!virtualCamera || !isVirtualCameraReady) {
     return false
   }
 
   try {
-    // エラーが発生していないか確認
-    if (virtualCameraProcess.killed || virtualCameraProcess.exitCode !== null) {
-      console.error('sendFrame: process has exited')
-      isVirtualCameraReady = false
-      return false
+    // デバッグ：最初の100フレームごとにデータをログ
+    if (frameCounter % 100 === 0) {
+      // 入力RGBAの最初の数ピクセルをチェック
+      const samplePixels: number[] = []
+      for (let i = 0; i < 20; i++) {
+        samplePixels.push(frameData[i])
+      }
+      console.log(`Frame ${frameCounter}: Input RGBA first 20 bytes:`, samplePixels)
+      console.log(`  Input size: ${frameData.length}, Expected: ${currentWidth * currentHeight * 4}`)
     }
 
-    virtualCameraProcess.stdin.write(frameData, (err) => {
-      if (err) {
-        console.error('Frame write error:', err.message)
-        isVirtualCameraReady = false
-      }
-    })
+    // RGBA → NV12 変換
+    const nv12Data = rgbaToNv12(frameData, currentWidth, currentHeight)
+
+    // 仮想カメラに書き込み
+    virtualCamera.write(nv12Data)
     frameCounter++
     return true
   } catch (error) {
     console.error('Failed to send frame:', error)
-    isVirtualCameraReady = false
     return false
   }
 }
