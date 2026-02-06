@@ -97,13 +97,14 @@ export function Controls({
                 const blob = new Blob([buffer.buffer as ArrayBuffer], { type: 'image/*' })
                 const file = new File([blob], filePath.split(/[/\\]/).pop() || 'background.png', { type: 'image/*' })
                 onBackgroundChange(file, filePath)
-                // 画像選択時はグリーンバックをOFFに
+                // 画像選択時はグリーンバックをOFFに、動画もクリア
                 if (isGreenScreen) {
                     onGreenScreenToggle()
                 }
+                onBackgroundVideoChange(null)
             }
         }
-    }, [onBackgroundChange, isGreenScreen, onGreenScreenToggle])
+    }, [onBackgroundChange, onBackgroundVideoChange, isGreenScreen, onGreenScreenToggle])
 
     const handleAnimationSelect = useCallback(() => {
         const input = document.createElement('input')
@@ -126,14 +127,15 @@ export function Controls({
             const files = (e.target as HTMLInputElement).files
             if (files && files.length > 0) {
                 onBackgroundVideoChange(files[0])
-                // 動画選択時はグリーンバックをOFFに
+                // 動画選択時はグリーンバックをOFFに、画像もクリア
                 if (isGreenScreen) {
                     onGreenScreenToggle()
                 }
+                onBackgroundChange(null)
             }
         }
         input.click()
-    }, [onBackgroundVideoChange, isGreenScreen, onGreenScreenToggle])
+    }, [onBackgroundVideoChange, onBackgroundChange, isGreenScreen, onGreenScreenToggle])
 
     return (
         <div className="controls">
@@ -149,7 +151,7 @@ export function Controls({
                     <button
                         className="control-button"
                         onClick={onClearVrm}
-                        title="VRMモデルを非表示にする"
+                        title={t.tooltips.hideVrm}
                     >
                         ⏹️ OFF
                     </button>
@@ -233,19 +235,26 @@ export function Controls({
 
             <h3>{t.background.title}</h3>
             <div className="control-group">
-                <button className="control-button" onClick={handleBackgroundSelect}>
+                <button className={`control-button ${backgroundImage ? 'active' : ''}`} onClick={handleBackgroundSelect}>
                     📁 {t.background.image}
                 </button>
             </div>
             <div className="control-group">
-                <button className="control-button" onClick={handleVideoSelect}>
+                <button className={`control-button ${backgroundVideo ? 'active' : ''}`} onClick={handleVideoSelect}>
                     🎬 {t.background.video}
                 </button>
             </div>
             <div className="control-group">
                 <button
                     className={`control-button ${isGreenScreen ? 'active' : ''}`}
-                    onClick={onGreenScreenToggle}
+                    onClick={() => {
+                        onGreenScreenToggle()
+                        // GBをONにする時は動画と画像をクリア
+                        if (!isGreenScreen) {
+                            onBackgroundVideoChange(null)
+                            onBackgroundChange(null)
+                        }
+                    }}
                 >
                     🟢 {t.background.greenScreen}
                 </button>
@@ -258,7 +267,7 @@ export function Controls({
                             onBackgroundChange(null)
                             onBackgroundVideoChange(null)
                         }}
-                        title="背景をクリア"
+                        title={t.tooltips.clearBackground}
                     >
                         ⏹️ OFF
                     </button>
@@ -267,7 +276,7 @@ export function Controls({
 
             <h3>{t.animation.title}</h3>
             <div className="control-group">
-                <button className="control-button" onClick={handleAnimationSelect} disabled={!hasVrm}>
+                <button className={`control-button ${animationUrl ? 'active' : ''}`} onClick={handleAnimationSelect} disabled={!hasVrm}>
                     📁 {t.animation.file}
                 </button>
             </div>
@@ -276,7 +285,7 @@ export function Controls({
                     <button
                         className="control-button"
                         onClick={() => onAnimationChange(null)}
-                        title="アニメーションを停止"
+                        title={t.tooltips.stopAnimation}
                     >
                         ⏹️ OFF
                     </button>
@@ -306,7 +315,7 @@ export function Controls({
                     onChange={(e) => onDeviceChange(e.target.value)}
                 >
                     {audioDevices.length === 0 ? (
-                        <option value="">マイクなし</option>
+                        <option value="">{t.outputMic.noMic}</option>
                     ) : (
                         audioDevices.map((device) => (
                             <option key={device.deviceId} value={device.deviceId}>
@@ -338,7 +347,7 @@ export function Controls({
                     className={`control-button virtual-camera-large ${isVirtualCameraOn ? 'active' : ''}`}
                     onClick={onVirtualCameraToggle}
                     disabled={isVirtualCameraConnecting || !hasVrm}
-                    title="OBS Virtual Cameraを使用して配信ソフトに映像を送信します"
+                    title={t.tooltips.virtualCameraHelp}
                 >
                     {isVirtualCameraConnecting
                         ? `⏳ ${t.virtualCamera.connecting}`

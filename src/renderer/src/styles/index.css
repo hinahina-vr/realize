@@ -666,3 +666,162 @@ body {
   background: linear-gradient(145deg, #f87171, #ef4444);
   box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
 }
+
+/* 仮想カメラプレビュー */
+.vcam-preview-container {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vcam-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.vcam-preview-toggle {
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vcam-preview-toggle:hover {
+  background: var(--accent);
+}
+
+.vcam-preview-toggle.active {
+  background: var(--danger);
+}
+
+.vcam-preview-error {
+  padding: 6px 8px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 4px;
+  color: #f87171;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.vcam-preview-video {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  background: #000;
+}
+
+/* トリガーボタン */
+.vcam-preview-trigger {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* モーダルオーバーレイ */
+.vcam-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* モーダルコンテンツ */
+.vcam-modal-content {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  max-width: 80vw;
+  max-height: 80vh;
+  overflow: hidden;
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.vcam-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.vcam-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.vcam-modal-close:hover {
+  background: var(--danger);
+  color: white;
+}
+
+.vcam-modal-video {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  background: #000;
+}
+
+.vcam-modal-footer {
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}

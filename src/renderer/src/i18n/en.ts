@@ -42,7 +42,8 @@ export const en: Translations = {
         file: '.vrma'
     },
     outputMic: {
-        title: '📐 Output / 🎙️ Mic'
+        title: '📐 Output / 🎙️ Mic',
+        noMic: 'No microphone'
     },
     colorAdjustment: {
         title: '🎨 Color Adjustment',
@@ -55,7 +56,11 @@ export const en: Translations = {
         title: '🎥 Virtual Camera',
         start: '🎥 Start Virtual Camera',
         stop: '🎥 Stop Virtual Camera',
-        connecting: 'Connecting...'
+        connecting: 'Connecting...',
+        preview: '📹 Output Check',
+        previewCheck: '👁️ Preview',
+        previewClose: 'Click to close',
+        previewNotFound: 'Virtual camera not found'
     },
     expressions: {
         neutral: 'Neutral',
@@ -70,8 +75,16 @@ export const en: Translations = {
         virtualCameraError: 'Failed to start virtual camera. Please start OBS and toggle "Start Virtual Camera" → "Stop Virtual Camera" once.',
         virtualCameraFailed: 'Failed to start virtual camera.'
     },
+    tooltips: {
+        hideVrm: 'Hide VRM model',
+        clearBackground: 'Clear background',
+        stopAnimation: 'Stop animation',
+        virtualCameraHelp: 'Send video to streaming software using virtual camera'
+    },
     dropZone: {
         title: 'Drop VRM File',
-        description: 'or click to select'
+        description: 'or click to select',
+        lastVrm: '📂 Last VRM',
+        invalidFile: 'Please drop a VRM file'
     }
 }

@@ -150,7 +150,16 @@ function VRMModel({
 
     // アニメーション読み込み
     useEffect(() => {
-        if (!vrm || !animationUrl || !mixerRef.current) return
+        // animationUrlがnullになったらアニメーションを停止
+        if (!animationUrl) {
+            if (currentActionRef.current) {
+                currentActionRef.current.fadeOut(0.5)
+                currentActionRef.current = null
+            }
+            return
+        }
+
+        if (!vrm || !mixerRef.current) return
 
         const loader = new GLTFLoader()
         loader.register((parser) => new VRMAnimationLoaderPlugin(parser))

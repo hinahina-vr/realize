@@ -1,12 +1,14 @@
 import { useCallback } from 'react'
+import type { Translations } from '../i18n'
 
 interface DropZoneProps {
     onFileDrop: (file: File, filePath: string | null) => void
     lastVrmPath?: string | null
     onLoadLastVrm?: () => void
+    t: Translations
 }
 
-export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZoneProps): JSX.Element {
+export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm, t }: DropZoneProps): JSX.Element {
     const handleDrop = useCallback(
         (e: React.DragEvent<HTMLDivElement>) => {
             e.preventDefault()
@@ -20,11 +22,11 @@ export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZonePro
                     const filePath = (file as File & { path?: string }).path || null
                     onFileDrop(file, filePath)
                 } else {
-                    alert('VRMファイルをドロップしてください')
+                    alert(t.dropZone.invalidFile)
                 }
             }
         },
-        [onFileDrop]
+        [onFileDrop, t]
     )
 
     const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -53,8 +55,8 @@ export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZonePro
         <div className="drop-zone" onDrop={handleDrop} onDragOver={handleDragOver} onClick={handleClick}>
             <div className="drop-zone-content">
                 <div className="drop-zone-icon">📁</div>
-                <h2>VRMファイルをドロップ</h2>
-                <p>または、クリックしてファイルを選択</p>
+                <h2>{t.dropZone.title}</h2>
+                <p>{t.dropZone.description}</p>
                 {lastVrmPath && onLoadLastVrm && (
                     <button
                         className="load-last-vrm-btn"
@@ -63,7 +65,7 @@ export function DropZone({ onFileDrop, lastVrmPath, onLoadLastVrm }: DropZonePro
                             onLoadLastVrm()
                         }}
                     >
-                        📂 前回のVRM: {lastVrmName}
+                        {t.dropZone.lastVrm}: {lastVrmName}
                     </button>
                 )}
             </div>

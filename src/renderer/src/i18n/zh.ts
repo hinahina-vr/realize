@@ -42,7 +42,8 @@ export const zh: Translations = {
         file: '.vrma'
     },
     outputMic: {
-        title: '📐 输出 / 🎙️ 麦克风'
+        title: '📐 输出 / 🎙️ 麦克风',
+        noMic: '没有麦克风'
     },
     colorAdjustment: {
         title: '🎨 色彩调整',
@@ -55,7 +56,11 @@ export const zh: Translations = {
         title: '🎥 虚拟摄像头',
         start: '🎥 启动虚拟摄像头',
         stop: '🎥 停止虚拟摄像头',
-        connecting: '连接中...'
+        connecting: '连接中...',
+        preview: '📹 输出确认',
+        previewCheck: '👁️ 预览',
+        previewClose: '点击关闭',
+        previewNotFound: '未找到虚拟摄像头'
     },
     expressions: {
         neutral: '自然',
@@ -70,8 +75,16 @@ export const zh: Translations = {
         virtualCameraError: '虚拟摄像头启动失败。请先启动OBS并点击"启动虚拟摄像头"→"停止虚拟摄像头"。',
         virtualCameraFailed: '虚拟摄像头启动失败。'
     },
+    tooltips: {
+        hideVrm: '隐藏VRM模型',
+        clearBackground: '清除背景',
+        stopAnimation: '停止动画',
+        virtualCameraHelp: '使用虚拟摄像头向直播软件发送视频'
+    },
     dropZone: {
         title: '拖放VRM文件',
-        description: '或点击选择'
+        description: '或点击选择',
+        lastVrm: '📂 上次的VRM',
+        invalidFile: '请拖放VRM文件'
     }
 }

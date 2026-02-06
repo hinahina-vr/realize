@@ -42,7 +42,8 @@ export const ko: Translations = {
         file: '.vrma'
     },
     outputMic: {
-        title: '📐 출력 / 🎙️ 마이크'
+        title: '📐 출력 / 🎙️ 마이크',
+        noMic: '마이크 없음'
     },
     colorAdjustment: {
         title: '🎨 색상 보정',
@@ -55,7 +56,11 @@ export const ko: Translations = {
         title: '🎥 가상 카메라',
         start: '🎥 가상 카메라 시작',
         stop: '🎥 가상 카메라 중지',
-        connecting: '연결 중...'
+        connecting: '연결 중...',
+        preview: '📹 출력 확인',
+        previewCheck: '👁️ 미리보기',
+        previewClose: '클릭하여 닫기',
+        previewNotFound: '가상 카메라를 찾을 수 없습니다'
     },
     expressions: {
         neutral: '기본',
@@ -70,8 +75,16 @@ export const ko: Translations = {
         virtualCameraError: '가상 카메라 시작에 실패했습니다. OBS를 실행하여 "가상 카메라 시작" → "가상 카메라 중지"를 한 번 실행해주세요.',
         virtualCameraFailed: '가상 카메라 시작에 실패했습니다.'
     },
+    tooltips: {
+        hideVrm: 'VRM 모델 숨기기',
+        clearBackground: '배경 지우기',
+        stopAnimation: '애니메이션 중지',
+        virtualCameraHelp: '가상 카메라를 사용하여 방송 소프트웨어에 영상 전송'
+    },
     dropZone: {
         title: 'VRM 파일을 드롭',
-        description: '또는 클릭하여 선택'
+        description: '또는 클릭하여 선택',
+        lastVrm: '📂 이전 VRM',
+        invalidFile: 'VRM 파일을 드롭해주세요'
     }
 }

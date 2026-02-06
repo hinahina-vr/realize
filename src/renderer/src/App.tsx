@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { VRMViewer } from './components/VRMViewer'
 import { DropZone } from './components/DropZone'
 import { Controls } from './components/Controls'
+import { VirtualCameraPreview } from './components/VirtualCameraPreview'
 import { getTranslation, languageFlags, type Language } from './i18n'
 import logoImage from './assets/logo.png'
 
@@ -618,6 +619,7 @@ function App(): JSX.Element {
                                 loadVrmFromPath(lastVrmPath)
                             }
                         }}
+                        t={t}
                     />
                 )}
             </main>
@@ -668,6 +670,7 @@ function App(): JSX.Element {
                     })}
                     t={t}
                 />
+                <VirtualCameraPreview isVirtualCameraOn={isVirtualCameraOn} t={t} />
             </aside>
 
             {/* 仮想カメラ用の隠しキャンバス */}

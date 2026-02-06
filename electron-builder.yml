@@ -11,16 +11,25 @@ files:
   - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
 asarUnpack:
   - resources/**
+  - node_modules/vcam-napi/**
 extraResources:
   - from: scripts
     to: scripts
+  - from: ../vcam/build/service/Release/vcam-service.dll
+    to: vcam-service.dll
+  - from: ../vcam/build/driver/Release/vcam-driver.dll
+    to: vcam-driver.dll
 win:
   executableName: Realize
+  requestedExecutionLevel: requireAdministrator
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  include: build/installer.nsh
+  oneClick: false
+  allowToChangeInstallationDirectory: true
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

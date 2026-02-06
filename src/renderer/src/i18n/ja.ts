@@ -51,6 +51,7 @@ export interface Translations {
     // 出力/マイク
     outputMic: {
         title: string
+        noMic: string
     }
     // 色調補正
     colorAdjustment: {
@@ -66,6 +67,10 @@ export interface Translations {
         start: string
         stop: string
         connecting: string
+        preview: string
+        previewCheck: string
+        previewClose: string
+        previewNotFound: string
     }
     // 表情
     expressions: {
@@ -82,10 +87,19 @@ export interface Translations {
         virtualCameraError: string
         virtualCameraFailed: string
     }
+    // ツールチップ
+    tooltips: {
+        hideVrm: string
+        clearBackground: string
+        stopAnimation: string
+        virtualCameraHelp: string
+    }
     // ドロップゾーン
     dropZone: {
         title: string
         description: string
+        lastVrm: string
+        invalidFile: string
     }
 }
 
@@ -131,7 +145,8 @@ export const ja: Translations = {
         file: '.vrma'
     },
     outputMic: {
-        title: '📐 出力 / 🎙️ マイク'
+        title: '📐 出力 / 🎙️ マイク',
+        noMic: 'マイクなし'
     },
     colorAdjustment: {
         title: '🎨 色調補正',
@@ -144,7 +159,11 @@ export const ja: Translations = {
         title: '🎥 仮想カメラ',
         start: '🎥 仮想カメラ起動',
         stop: '🎥 仮想カメラ停止',
-        connecting: '接続中...'
+        connecting: '接続中...',
+        preview: '📹 出力確認',
+        previewCheck: '👁️ プレビュー',
+        previewClose: 'クリックで閉じる',
+        previewNotFound: '仮想カメラが見つかりません'
     },
     expressions: {
         neutral: '通常',
@@ -159,8 +178,16 @@ export const ja: Translations = {
         virtualCameraError: '仮想カメラの起動に失敗しました。OBSを一度起動して「仮想カメラ開始」→「仮想カメラ停止」を行ってください。',
         virtualCameraFailed: '仮想カメラの起動に失敗しました。'
     },
+    tooltips: {
+        hideVrm: 'VRMモデルを非表示にする',
+        clearBackground: '背景をクリア',
+        stopAnimation: 'アニメーションを停止',
+        virtualCameraHelp: '仮想カメラを使用して配信ソフトに映像を送信します'
+    },
     dropZone: {
         title: 'VRMファイルをドロップ',
-        description: 'または クリックして選択'
+        description: 'または クリックして選択',
+        lastVrm: '📂 前回のVRM',
+        invalidFile: 'VRMファイルをドロップしてください'
     }
 }
