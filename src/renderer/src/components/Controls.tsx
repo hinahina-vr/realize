@@ -30,6 +30,8 @@ interface ControlsProps {
     hasVrm: boolean
     animationUrl: string | null
     onAnimationChange: (file: File | null) => void
+    selectedAnimationPreset: string | null
+    onAnimationPresetChange: (presetId: string | null) => void
     colorAdjustment: ColorAdjustment
     onColorAdjustmentChange: (adjustment: ColorAdjustment) => void
     expression: ExpressionType
@@ -74,6 +76,8 @@ export function Controls({
     hasVrm,
     animationUrl,
     onAnimationChange,
+    selectedAnimationPreset,
+    onAnimationPresetChange,
     colorAdjustment,
     onColorAdjustmentChange,
     expression,
@@ -233,6 +237,29 @@ export function Controls({
                 </div>
             </div>
 
+            <h3>{t.animation.title}</h3>
+            <div className="control-group">
+                <button
+                    className={`control-button ${animationUrl && !selectedAnimationPreset ? 'active' : ''}`}
+                    onClick={handleAnimationSelect}
+                    disabled={!hasVrm}
+                >
+                    📁 {t.animation.file}
+                </button>
+                {(animationUrl || selectedAnimationPreset) && (
+                    <button
+                        className="control-button"
+                        onClick={() => {
+                            onAnimationChange(null)
+                            onAnimationPresetChange(null)
+                        }}
+                        title={t.tooltips.stopAnimation}
+                    >
+                        ⏹️ OFF
+                    </button>
+                )}
+            </div>
+
             <h3>{t.background.title}</h3>
             <div className="control-group">
                 <button className={`control-button ${backgroundImage ? 'active' : ''}`} onClick={handleBackgroundSelect}>
@@ -273,25 +300,6 @@ export function Controls({
                     </button>
                 )}
             </div>
-
-            <h3>{t.animation.title}</h3>
-            <div className="control-group">
-                <button className={`control-button ${animationUrl ? 'active' : ''}`} onClick={handleAnimationSelect} disabled={!hasVrm}>
-                    📁 {t.animation.file}
-                </button>
-            </div>
-            <div className="control-group">
-                {animationUrl && (
-                    <button
-                        className="control-button"
-                        onClick={() => onAnimationChange(null)}
-                        title={t.tooltips.stopAnimation}
-                    >
-                        ⏹️ OFF
-                    </button>
-                )}
-            </div>
-            <div className="control-group" />
 
             <h3>{t.outputMic.title}</h3>
             <div className="control-group">

@@ -34,11 +34,22 @@ const fileAPI = {
   }
 }
 
+// VRMA Preset API
+const vrmaAPI = {
+  getPresetIds: (): Promise<string[]> => {
+    return ipcRenderer.invoke('vrma:getPresetIds')
+  },
+  getPreset: (presetId: string): Promise<Uint8Array | null> => {
+    return ipcRenderer.invoke('vrma:getPreset', presetId)
+  }
+}
+
 // Custom APIs for renderer
 const api = {
   virtualCamera: virtualCameraAPI,
   dialog: dialogAPI,
-  file: fileAPI
+  file: fileAPI,
+  vrma: vrmaAPI
 }
 
 if (process.contextIsolated) {

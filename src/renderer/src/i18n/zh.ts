@@ -39,7 +39,14 @@ export const zh: Translations = {
     },
     animation: {
         title: '💃 动画',
-        file: '.vrma'
+        file: '.vrma',
+        fullbody: '全身',
+        greeting: '问候',
+        vsign: 'V手势',
+        shoot: '射击',
+        spin: '旋转',
+        pose: '姿势',
+        squat: '深蹲'
     },
     outputMic: {
         title: '📐 输出 / 🎙️ 麦克风',

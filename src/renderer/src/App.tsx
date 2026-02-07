@@ -2,12 +2,13 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { VRMViewer } from './components/VRMViewer'
 import { DropZone } from './components/DropZone'
 import { Controls } from './components/Controls'
+import { AnimationPlaylist } from './components/AnimationPlaylist'
 import { VirtualCameraPreview } from './components/VirtualCameraPreview'
 import { getTranslation, languageFlags, type Language } from './i18n'
 import logoImage from './assets/logo.png'
 
 // LoC (ビルド時に固定)
-const LOC_COUNT = 2930
+const LOC_COUNT = 4060
 
 interface AudioDevice {
     deviceId: string
@@ -123,6 +124,17 @@ function App(): JSX.Element {
     const [isVirtualCameraOn, setIsVirtualCameraOn] = useState(false)
     const [isVirtualCameraConnecting, setIsVirtualCameraConnecting] = useState(false)
     const [animationUrl, setAnimationUrl] = useState<string | null>(null)
+    const [selectedAnimationPreset, setSelectedAnimationPreset] = useState<string | null>(null)
+    // アニメーションプレイリスト
+    const [animationQueue, setAnimationQueue] = useState<string[]>([])
+    const [animationStock, setAnimationStock] = useState<string[]>(
+        ['fullbody', 'greeting', 'vsign', 'shoot', 'spin', 'pose', 'squat']
+    )
+    const [isAnimationLooping, setIsAnimationLooping] = useState(false)
+    const [currentQueueIndex, setCurrentQueueIndex] = useState(0)
+    const [animationIntervalSecs, setAnimationIntervalSecs] = useState(5)
+    const [intervalProgress, setIntervalProgress] = useState(0) // 0-100% カウントダウン
+    const [isInInterval, setIsInInterval] = useState(false) // インターバル待機中
     const [currentExpression, setCurrentExpression] = useState<ExpressionType>('happy')
     const [colorAdjustment, setColorAdjustment] = useState<ColorAdjustment>(initialSettings.colorAdjustment)
     const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 })
@@ -468,12 +480,109 @@ function App(): JSX.Element {
             if (file) {
                 const url = URL.createObjectURL(file)
                 setAnimationUrl(url)
+                setSelectedAnimationPreset(null) // カスタムファイル選択時はプリセット解除
             } else {
                 setAnimationUrl(null)
             }
         },
         [animationUrl]
     )
+
+    // プリセットアニメーション変更ハンドラ
+    const handleAnimationPresetChange = useCallback(
+        async (presetId: string | null) => {
+            // 現在のアニメーションをクリア
+            if (animationUrl) {
+                URL.revokeObjectURL(animationUrl)
+                setAnimationUrl(null)
+            }
+
+            if (!presetId) {
+                setSelectedAnimationPreset(null)
+                return
+            }
+
+            try {
+                // プリセットVRMAを取得（Uint8Arrayで受信）
+                console.log('Requesting preset:', presetId)
+                const data = await window.api.vrma.getPreset(presetId)
+                console.log('Received data:', data)
+                if (data) {
+                    const blob = new Blob([new Uint8Array(data)], { type: 'application/octet-stream' })
+                    const url = URL.createObjectURL(blob)
+                    console.log('Created URL:', url)
+                    setAnimationUrl(url)
+                    setSelectedAnimationPreset(presetId)
+                }
+            } catch (error) {
+                console.error('Failed to load animation preset:', error)
+            }
+        },
+        [animationUrl]
+    )
+
+    // ループ再生開始時にキューの先頭アニメーションを再生
+    useEffect(() => {
+        if (isAnimationLooping && animationQueue.length > 0) {
+            const firstPreset = animationQueue[currentQueueIndex]
+            if (firstPreset && selectedAnimationPreset !== firstPreset) {
+                handleAnimationPresetChange(firstPreset)
+            }
+        }
+    }, [isAnimationLooping, animationQueue])
+
+    // ループ停止時にアニメーション停止
+    useEffect(() => {
+        if (!isAnimationLooping && selectedAnimationPreset) {
+            handleAnimationPresetChange(null)
+            setCurrentQueueIndex(0)
+        }
+    }, [isAnimationLooping])
+
+    // アニメーション終了時：インターバル待機後に次のアニメーションを再生
+    const handleAnimationEnd = useCallback(() => {
+        if (!isAnimationLooping || animationQueue.length === 0) return
+
+        // インターバルが0の場合は即座に次へ
+        if (animationIntervalSecs === 0) {
+            const nextIndex = (currentQueueIndex + 1) % animationQueue.length
+            setCurrentQueueIndex(nextIndex)
+            const nextPreset = animationQueue[nextIndex]
+            if (nextPreset) {
+                handleAnimationPresetChange(nextPreset)
+            }
+            return
+        }
+
+        // インターバル開始
+        setIsInInterval(true)
+        setIntervalProgress(100)
+        const startTime = performance.now()
+        const intervalMs = animationIntervalSecs * 1000
+
+        const animate = (currentTime: number) => {
+            const elapsed = currentTime - startTime
+            const remaining = Math.max(0, 100 - (elapsed / intervalMs) * 100)
+            setIntervalProgress(remaining)
+
+            if (elapsed >= intervalMs) {
+                setIsInInterval(false)
+                setIntervalProgress(0)
+
+                // 次のアニメーション
+                const nextIndex = (currentQueueIndex + 1) % animationQueue.length
+                setCurrentQueueIndex(nextIndex)
+                const nextPreset = animationQueue[nextIndex]
+                if (nextPreset) {
+                    handleAnimationPresetChange(nextPreset)
+                }
+            } else {
+                requestAnimationFrame(animate)
+            }
+        }
+        requestAnimationFrame(animate)
+    }, [isAnimationLooping, animationQueue, currentQueueIndex, animationIntervalSecs, handleAnimationPresetChange])
+
 
     return (
         <div className="app">
@@ -559,6 +668,7 @@ function App(): JSX.Element {
                             colorAdjustment={colorAdjustment}
                             onPreviewSizeChange={setPreviewSize}
                             onFpsChange={setFps}
+                            onAnimationEnd={handleAnimationEnd}
                             customCameraPosition={customCameraPositions[cameraPreset] || null}
                             cameraRef={cameraRef}
                         />
@@ -609,6 +719,19 @@ function App(): JSX.Element {
                                 <span>驚き</span>
                             </button>
                         </div>
+                        <AnimationPlaylist
+                            queue={animationQueue}
+                            stock={animationStock}
+                            onQueueChange={setAnimationQueue}
+                            onStockChange={setAnimationStock}
+                            currentPlayingId={selectedAnimationPreset}
+                            isLooping={isAnimationLooping}
+                            onLoopToggle={() => setIsAnimationLooping(!isAnimationLooping)}
+                            intervalSecs={animationIntervalSecs}
+                            onIntervalChange={setAnimationIntervalSecs}
+                            intervalProgress={intervalProgress}
+                            t={t}
+                        />
                     </>
                 ) : (
                     <DropZone
@@ -651,6 +774,8 @@ function App(): JSX.Element {
                     hasVrm={!!vrmUrl}
                     animationUrl={animationUrl}
                     onAnimationChange={handleAnimationChange}
+                    selectedAnimationPreset={selectedAnimationPreset}
+                    onAnimationPresetChange={handleAnimationPresetChange}
                     colorAdjustment={colorAdjustment}
                     onColorAdjustmentChange={setColorAdjustment}
                     expression={currentExpression}

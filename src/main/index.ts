@@ -1,8 +1,16 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { readFile } from 'fs/promises'
+import { readFile as readFileAsync } from 'fs/promises'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import * as crypto from 'crypto'
 import icon from '../../resources/icon.png?asset'
+
+// VRMA暗号化キー（encrypt-vrma.jsと同じキー）
+const VRMA_ENCRYPTION_KEY = Buffer.from('R3al1z3VRM4Pr3s3tK3y2024Encrypt!', 'utf8')
+const IV_LENGTH = 16
+
+// VRMAキャッシュ
+let vrmaCache: Record<string, Buffer> | null = null
 
 // vcam-napi - ネイティブ仮想カメラモジュール
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -239,12 +247,69 @@ app.whenReady().then(() => {
   // ファイル読み込み
   ipcMain.handle('file:readAsBuffer', async (_, filePath: string) => {
     try {
-      const buffer = await readFile(filePath)
+      const buffer = await readFileAsync(filePath)
       return buffer
     } catch (error) {
       console.error('Failed to read file:', error)
       return null
     }
+  })
+
+  // VRMA復号化関数
+  function decryptVrma(encryptedData: Buffer): Buffer {
+    const iv = encryptedData.subarray(0, IV_LENGTH)
+    const encrypted = encryptedData.subarray(IV_LENGTH)
+    const decipher = crypto.createDecipheriv('aes-256-cbc', VRMA_ENCRYPTION_KEY, iv)
+    return Buffer.concat([decipher.update(encrypted), decipher.final()])
+  }
+
+  // VRMAプリセット読み込み
+  async function loadVrmaPresets(): Promise<Record<string, Buffer>> {
+    if (vrmaCache) return vrmaCache
+
+    // 開発モード: プロジェクトルート/resources
+    // 本番モード: process.resourcesPath
+    const encryptedPath = is.dev
+      ? join(app.getAppPath(), 'resources', 'animations.enc')
+      : join(process.resourcesPath, 'animations.enc')
+
+    console.log('Loading VRMA presets from:', encryptedPath)
+    try {
+      const encryptedBundle = await readFileAsync(encryptedPath)
+      const decryptedBundle = decryptVrma(encryptedBundle)
+      const bundle = JSON.parse(decryptedBundle.toString('utf8'))
+
+      vrmaCache = {}
+      for (const [id, base64Data] of Object.entries(bundle.animations)) {
+        const encryptedAnimation = Buffer.from(base64Data as string, 'base64')
+        vrmaCache[id] = decryptVrma(encryptedAnimation)
+      }
+      console.log('VRMA presets loaded:', Object.keys(vrmaCache))
+      return vrmaCache
+    } catch (error) {
+      console.error('Failed to load VRMA presets:', error)
+      return {}
+    }
+  }
+
+  // VRMAプリセット一覧取得
+  ipcMain.handle('vrma:getPresetIds', async () => {
+    const presets = await loadVrmaPresets()
+    return Object.keys(presets)
+  })
+
+  // VRMAプリセット取得
+  ipcMain.handle('vrma:getPreset', async (_, presetId: string) => {
+    console.log('vrma:getPreset called with:', presetId)
+    const presets = await loadVrmaPresets()
+    const buffer = presets[presetId]
+    if (!buffer) {
+      console.log('Preset not found:', presetId)
+      return null
+    }
+    console.log('Returning preset:', presetId, 'size:', buffer.length)
+    // BufferをUint8Arrayに変換して送信（contextBridge経由での互換性）
+    return new Uint8Array(buffer)
   })
 
   createWindow()

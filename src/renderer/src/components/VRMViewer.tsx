@@ -38,6 +38,7 @@ interface VRMViewerProps {
     colorAdjustment?: ColorAdjustment
     onPreviewSizeChange?: (size: { width: number; height: number }) => void
     onFpsChange?: (fps: number) => void
+    onAnimationEnd?: () => void
     customCameraPosition?: {
         position: [number, number, number]
         target: [number, number, number]
@@ -61,7 +62,8 @@ function VRMModel({
     selectedDeviceId,
     animationUrl,
     expression,
-    onVrmLoad
+    onVrmLoad,
+    onAnimationEnd
 }: {
     vrmUrl: string
     isLipSyncEnabled: boolean
@@ -69,6 +71,7 @@ function VRMModel({
     animationUrl?: string | null
     expression?: ExpressionType
     onVrmLoad?: (vrm: VRM) => void
+    onAnimationEnd?: () => void
 }): JSX.Element | null {
     const [vrm, setVrm] = useState<VRM | null>(null)
     const analyserRef = useRef<AnalyserNode | null>(null)
@@ -174,11 +177,24 @@ function VRMModel({
                         currentActionRef.current.fadeOut(0.5)
                     }
 
-                    // 新しいアニメーションを再生
+                    // 新しいアニメーションを再生（1回再生で終了）
                     const clip = createVRMAnimationClip(vrmAnimation, vrm)
                     const action = mixerRef.current.clipAction(clip)
+                    action.setLoop(THREE.LoopOnce, 1)
+                    action.clampWhenFinished = true
                     action.reset().fadeIn(0.5).play()
                     currentActionRef.current = action
+
+                    // アニメーション終了時のコールバック
+                    const handleFinished = (): void => {
+                        console.log('Animation finished')
+                        if (onAnimationEnd) {
+                            onAnimationEnd()
+                        }
+                        mixerRef.current?.removeEventListener('finished', handleFinished)
+                    }
+                    mixerRef.current.addEventListener('finished', handleFinished)
+
                     console.log('Animation loaded:', animationUrl)
                 }
             },
@@ -187,7 +203,7 @@ function VRMModel({
                 console.error('Error loading animation:', error)
             }
         )
-    }, [vrm, animationUrl])
+    }, [vrm, animationUrl, onAnimationEnd])
 
     // リップシンク用オーディオ設定（デバイス選択対応）
     useEffect(() => {
@@ -556,6 +572,7 @@ export function VRMViewer({
     colorAdjustment,
     onPreviewSizeChange,
     onFpsChange,
+    onAnimationEnd,
     customCameraPosition,
     cameraRef
 }: VRMViewerProps): JSX.Element {
@@ -644,6 +661,7 @@ export function VRMViewer({
                     selectedDeviceId={selectedDeviceId}
                     animationUrl={animationUrl}
                     expression={expression}
+                    onAnimationEnd={onAnimationEnd}
                 />
                 <CameraController cameraPreset={cameraPreset} customCameraPosition={customCameraPosition} />
                 <OrbitControls

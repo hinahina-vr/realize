@@ -16,10 +16,16 @@ interface FileAPI {
   readAsBuffer: (filePath: string) => Promise<Buffer | null>
 }
 
+interface VrmaAPI {
+  getPresetIds: () => Promise<string[]>
+  getPreset: (presetId: string) => Promise<Uint8Array | null>
+}
+
 interface API {
   virtualCamera: VirtualCameraAPI
   dialog: DialogAPI
   file: FileAPI
+  vrma: VrmaAPI
 }
 
 declare global {

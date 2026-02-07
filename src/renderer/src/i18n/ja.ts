@@ -47,6 +47,13 @@ export interface Translations {
     animation: {
         title: string
         file: string
+        fullbody: string
+        greeting: string
+        vsign: string
+        shoot: string
+        spin: string
+        pose: string
+        squat: string
     }
     // 出力/マイク
     outputMic: {
@@ -142,7 +149,14 @@ export const ja: Translations = {
     },
     animation: {
         title: '💃 アニメーション',
-        file: '.vrma'
+        file: '.vrma',
+        fullbody: '全身',
+        greeting: '挨拶',
+        vsign: 'Vサイン',
+        shoot: '撃つ',
+        spin: '回る',
+        pose: 'ポーズ',
+        squat: '屈伸'
     },
     outputMic: {
         title: '📐 出力 / 🎙️ マイク',

@@ -39,7 +39,14 @@ export const en: Translations = {
     },
     animation: {
         title: '💃 Animation',
-        file: '.vrma'
+        file: '.vrma',
+        fullbody: 'Full Body',
+        greeting: 'Greeting',
+        vsign: 'V Sign',
+        shoot: 'Shoot',
+        spin: 'Spin',
+        pose: 'Pose',
+        squat: 'Squat'
     },
     outputMic: {
         title: '📐 Output / 🎙️ Mic',

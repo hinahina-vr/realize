@@ -39,7 +39,14 @@ export const ko: Translations = {
     },
     animation: {
         title: '💃 애니메이션',
-        file: '.vrma'
+        file: '.vrma',
+        fullbody: '전신',
+        greeting: '인사',
+        vsign: 'V사인',
+        shoot: '쏘기',
+        spin: '회전',
+        pose: '포즈',
+        squat: '스쿼트'
     },
     outputMic: {
         title: '📐 출력 / 🎙️ 마이크',
