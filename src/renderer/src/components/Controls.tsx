@@ -36,10 +36,7 @@ interface ControlsProps {
     onColorAdjustmentChange: (adjustment: ColorAdjustment) => void
     expression: ExpressionType
     onExpressionChange: (expression: ExpressionType) => void
-    isAutoExpression: boolean
-    onAutoExpressionToggle: () => void
-    expressionInterval: number
-    onExpressionIntervalChange: (interval: number) => void
+
     onSaveCameraPosition?: () => void
     hasCustomCameraPosition?: boolean
     onResetCameraPosition?: () => void
@@ -82,10 +79,7 @@ export function Controls({
     onColorAdjustmentChange,
     expression,
     onExpressionChange,
-    isAutoExpression,
-    onAutoExpressionToggle,
-    expressionInterval,
-    onExpressionIntervalChange,
+
     onSaveCameraPosition,
     hasCustomCameraPosition,
     onResetCameraPosition,
@@ -213,29 +207,7 @@ export function Controls({
             </div>
             <div className="control-group" />
 
-            <h3>{t.autoExpression.title}</h3>
-            <div className="control-group">
-                <button
-                    className={`control-button toggle ${isAutoExpression ? 'active' : ''}`}
-                    onClick={onAutoExpressionToggle}
-                >
-                    {isAutoExpression ? `🔄 ${t.autoExpression.on}` : `⏸️ ${t.autoExpression.off}`}
-                </button>
-            </div>
-            <div className="control-group" style={{ opacity: isAutoExpression ? 1 : 0.3 }}>
-                <div className="slider-group compact">
-                    <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>{expressionInterval}s</span>
-                    <input
-                        type="range"
-                        className="control-slider"
-                        min="2"
-                        max="15"
-                        value={expressionInterval}
-                        onChange={(e) => onExpressionIntervalChange(Number(e.target.value))}
-                        disabled={!isAutoExpression}
-                    />
-                </div>
-            </div>
+
 
             <h3>{t.animation.title}</h3>
             <div className="control-group">

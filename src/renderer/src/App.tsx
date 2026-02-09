@@ -27,6 +27,15 @@ const OUTPUT_SIZE_MAP: Record<OutputSize, { width: number; height: number; label
 
 export type ExpressionType = 'neutral' | 'happy' | 'angry' | 'sad' | 'relaxed' | 'surprised'
 
+const EXPRESSION_ITEMS: { id: ExpressionType; emoji: string; label: string }[] = [
+    { id: 'neutral', emoji: '😐', label: '通常' },
+    { id: 'happy', emoji: '😊', label: '笑顔' },
+    { id: 'angry', emoji: '😠', label: '怒り' },
+    { id: 'sad', emoji: '😢', label: '悲しい' },
+    { id: 'relaxed', emoji: '😌', label: 'ﾘﾗｯｸｽ' },
+    { id: 'surprised', emoji: '😲', label: '驚き' }
+]
+
 export type ThemeType = 'dark-rum' | 'white-liquor' | 'wine-red' | 'sherry-cask'
 
 export interface ColorAdjustment {
@@ -126,9 +135,9 @@ function App(): JSX.Element {
     const [animationUrl, setAnimationUrl] = useState<string | null>(null)
     const [selectedAnimationPreset, setSelectedAnimationPreset] = useState<string | null>(null)
     // アニメーションプレイリスト
-    const [animationQueue, setAnimationQueue] = useState<string[]>([])
+    const [animationQueue, setAnimationQueue] = useState<string[]>(['greeting'])
     const [animationStock, setAnimationStock] = useState<string[]>(
-        ['fullbody', 'greeting', 'vsign', 'shoot', 'spin', 'pose', 'squat']
+        ['fullbody', 'vsign', 'shoot', 'spin', 'pose', 'squat']
     )
     const [isAnimationLooping, setIsAnimationLooping] = useState(false)
     const [currentQueueIndex, setCurrentQueueIndex] = useState(0)
@@ -141,6 +150,13 @@ function App(): JSX.Element {
     const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight })
     const [isAutoExpression, setIsAutoExpression] = useState(initialSettings.isAutoExpression)
     const [expressionInterval, setExpressionInterval] = useState(initialSettings.expressionInterval)
+    const [expressionQueue, setExpressionQueue] = useState<ExpressionType[]>(
+        ['neutral', 'happy', 'relaxed']
+    )
+    const [expressionStock, setExpressionStock] = useState<ExpressionType[]>(
+        ['angry', 'sad', 'surprised']
+    )
+    const [expressionQueueIndex, setExpressionQueueIndex] = useState(0)
     const [isGreenScreen, setIsGreenScreen] = useState(initialSettings.isGreenScreen)
     const [theme, setTheme] = useState<ThemeType>(initialSettings.theme)
     const [customCameraPositions, setCustomCameraPositions] = useState<{
@@ -250,23 +266,11 @@ function App(): JSX.Element {
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // 自動ループする表情のリスト（通常、笑顔、リラックス）
-    const loopExpressions: ExpressionType[] = ['neutral', 'happy', 'relaxed']
-    const [nextExpressionIndex, setNextExpressionIndex] = useState(0)
     const [expressionProgress, setExpressionProgress] = useState(0)
 
-    // ランダムに次の表情を選択（現在の表情以外から）
-    const getRandomNextIndex = (currentIndex: number): number => {
-        let next: number
-        do {
-            next = Math.floor(Math.random() * loopExpressions.length)
-        } while (next === currentIndex && loopExpressions.length > 1)
-        return next
-    }
-
-    // 自動表情ループ（ランダム）
+    // 自動表情ループ（順番ベース：expressionQueueの左から順）
     useEffect(() => {
-        if (!isAutoExpression) {
+        if (!isAutoExpression || expressionQueue.length === 0) {
             if (autoExpressionRef.current) {
                 clearInterval(autoExpressionRef.current)
                 autoExpressionRef.current = null
@@ -275,37 +279,42 @@ function App(): JSX.Element {
             return
         }
 
-        // 最初の表情をランダムに設定
-        let currentIdx = Math.floor(Math.random() * loopExpressions.length)
-        setCurrentExpression(loopExpressions[currentIdx])
-        let nextIdx = getRandomNextIndex(currentIdx)
-        setNextExpressionIndex(nextIdx)
+        // 最初の表情を設定
+        setExpressionQueueIndex(0)
+        setCurrentExpression(expressionQueue[0])
         setExpressionProgress(0)
 
-        // 進捗更新（100msごと）
-        const progressInterval = setInterval(() => {
-            setExpressionProgress((prev) => {
-                const step = 100 / (expressionInterval * 10)
-                return Math.min(prev + step, 100)
-            })
-        }, 100)
+        const startTime = { current: performance.now() }
+        const intervalMs = expressionInterval * 1000
+        let currentIdx = 0
 
-        // 表情変更
-        autoExpressionRef.current = setInterval(() => {
-            currentIdx = nextIdx
-            setCurrentExpression(loopExpressions[currentIdx])
-            nextIdx = getRandomNextIndex(currentIdx)
-            setNextExpressionIndex(nextIdx)
-            setExpressionProgress(0)
-        }, expressionInterval * 1000)
+        // requestAnimationFrame でプログレス更新
+        let rafId: number
+        const animate = (currentTime: number) => {
+            const elapsed = currentTime - startTime.current
+            const progress = Math.min((elapsed / intervalMs) * 100, 100)
+            setExpressionProgress(progress)
+
+            if (elapsed >= intervalMs) {
+                // 次の表情へ
+                currentIdx = (currentIdx + 1) % expressionQueue.length
+                setExpressionQueueIndex(currentIdx)
+                setCurrentExpression(expressionQueue[currentIdx])
+                setExpressionProgress(0)
+                startTime.current = performance.now()
+            }
+
+            rafId = requestAnimationFrame(animate)
+        }
+        rafId = requestAnimationFrame(animate)
 
         return () => {
+            cancelAnimationFrame(rafId)
             if (autoExpressionRef.current) {
                 clearInterval(autoExpressionRef.current)
             }
-            clearInterval(progressInterval)
         }
-    }, [isAutoExpression, expressionInterval])
+    }, [isAutoExpression, expressionInterval, expressionQueue])
 
     // オーディオデバイスを取得
     useEffect(() => {
@@ -672,52 +681,146 @@ function App(): JSX.Element {
                             customCameraPosition={customCameraPositions[cameraPreset] || null}
                             cameraRef={cameraRef}
                         />
-                        <div className="expression-buttons">
-                            <button
-                                className={`expression-btn ${currentExpression === 'neutral' ? 'active' : ''} ${isAutoExpression && currentExpression === 'neutral' ? 'countdown' : ''} ${isAutoExpression && loopExpressions[nextExpressionIndex] === 'neutral' ? 'next' : ''}`}
-                                onClick={() => setCurrentExpression('neutral')}
-                                style={isAutoExpression && currentExpression === 'neutral' ? { '--progress': `${expressionProgress}%` } as React.CSSProperties : {}}
+                        <div className="expression-playlist">
+                            <div className="expression-lane expression-queue"
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                    e.preventDefault()
+                                    const fromLane = e.dataTransfer.getData('expression-lane')
+                                    const fromIndex = Number(e.dataTransfer.getData('expression-index'))
+                                    if (fromLane === 'stock' && !isNaN(fromIndex)) {
+                                        const expr = expressionStock[fromIndex]
+                                        setExpressionStock(prev => prev.filter((_, i) => i !== fromIndex))
+                                        setExpressionQueue(prev => [...prev, expr])
+                                    }
+                                }}
                             >
-                                <span className="emoji">😐</span>
-                                <span>通常</span>
-                            </button>
-                            <button
-                                className={`expression-btn ${currentExpression === 'happy' ? 'active' : ''} ${isAutoExpression && currentExpression === 'happy' ? 'countdown' : ''} ${isAutoExpression && loopExpressions[nextExpressionIndex] === 'happy' ? 'next' : ''}`}
-                                onClick={() => setCurrentExpression('happy')}
-                                style={isAutoExpression && currentExpression === 'happy' ? { '--progress': `${expressionProgress}%` } as React.CSSProperties : {}}
+                                {expressionQueue.map((exprId: ExpressionType, index: number) => {
+                                    const item = EXPRESSION_ITEMS.find(i => i.id === exprId)
+                                    if (!item) return null
+                                    const isActive = currentExpression === exprId
+                                    const isNext = isAutoExpression && expressionQueue[(expressionQueueIndex + 1) % expressionQueue.length] === exprId
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            className={`expression-btn ${isActive ? 'active' : ''} ${isActive && isAutoExpression ? 'countdown' : ''} ${isNext ? 'next' : ''}`}
+                                            onClick={() => setCurrentExpression(exprId)}
+                                            style={isActive && isAutoExpression ? { '--progress': `${expressionProgress}%` } as React.CSSProperties : {}}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.setData('expression-lane', 'queue')
+                                                e.dataTransfer.setData('expression-index', String(index))
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                const fromLane = e.dataTransfer.getData('expression-lane')
+                                                const fromIndex = Number(e.dataTransfer.getData('expression-index'))
+                                                if (isNaN(fromIndex)) return
+                                                if (fromLane === 'queue') {
+                                                    if (fromIndex === index) return
+                                                    const newQueue = [...expressionQueue]
+                                                    const [moved] = newQueue.splice(fromIndex, 1)
+                                                    newQueue.splice(index, 0, moved)
+                                                    setExpressionQueue(newQueue)
+                                                } else if (fromLane === 'stock') {
+                                                    const expr = expressionStock[fromIndex]
+                                                    setExpressionStock(prev => prev.filter((_, i) => i !== fromIndex))
+                                                    const newQueue = [...expressionQueue]
+                                                    newQueue.splice(index, 0, expr)
+                                                    setExpressionQueue(newQueue)
+                                                }
+                                            }}
+                                        >
+                                            <span className="emoji">{item.emoji}</span>
+                                            <span>{item.label}</span>
+                                        </button>
+                                    )
+                                })}
+                                {expressionQueue.length === 0 && <div className="empty-hint">ドロップ</div>}
+                            </div>
+                            <div className="expression-divider" />
+                            <div className="expression-lane expression-stock"
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                    e.preventDefault()
+                                    const fromLane = e.dataTransfer.getData('expression-lane')
+                                    const fromIndex = Number(e.dataTransfer.getData('expression-index'))
+                                    if (fromLane === 'queue' && !isNaN(fromIndex)) {
+                                        const expr = expressionQueue[fromIndex]
+                                        setExpressionQueue(prev => prev.filter((_, i) => i !== fromIndex))
+                                        setExpressionStock(prev => [...prev, expr])
+                                    }
+                                }}
                             >
-                                <span className="emoji">😊</span>
-                                <span>笑顔</span>
-                            </button>
-                            <button
-                                className={`expression-btn ${currentExpression === 'angry' ? 'active' : ''}`}
-                                onClick={() => setCurrentExpression('angry')}
-                            >
-                                <span className="emoji">😠</span>
-                                <span>怒り</span>
-                            </button>
-                            <button
-                                className={`expression-btn ${currentExpression === 'sad' ? 'active' : ''}`}
-                                onClick={() => setCurrentExpression('sad')}
-                            >
-                                <span className="emoji">😢</span>
-                                <span>悲しい</span>
-                            </button>
-                            <button
-                                className={`expression-btn ${currentExpression === 'relaxed' ? 'active' : ''} ${isAutoExpression && currentExpression === 'relaxed' ? 'countdown' : ''} ${isAutoExpression && loopExpressions[nextExpressionIndex] === 'relaxed' ? 'next' : ''}`}
-                                onClick={() => setCurrentExpression('relaxed')}
-                                style={isAutoExpression && currentExpression === 'relaxed' ? { '--progress': `${expressionProgress}%` } as React.CSSProperties : {}}
-                            >
-                                <span className="emoji">😌</span>
-                                <span>ﾘﾗｯｸｽ</span>
-                            </button>
-                            <button
-                                className={`expression-btn ${currentExpression === 'surprised' ? 'active' : ''}`}
-                                onClick={() => setCurrentExpression('surprised')}
-                            >
-                                <span className="emoji">😲</span>
-                                <span>驚き</span>
-                            </button>
+                                {expressionStock.map((exprId: ExpressionType, index: number) => {
+                                    const item = EXPRESSION_ITEMS.find(i => i.id === exprId)
+                                    if (!item) return null
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            className="expression-btn stock"
+                                            onClick={() => setCurrentExpression(exprId)}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.setData('expression-lane', 'stock')
+                                                e.dataTransfer.setData('expression-index', String(index))
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                const fromLane = e.dataTransfer.getData('expression-lane')
+                                                const fromIndex = Number(e.dataTransfer.getData('expression-index'))
+                                                if (isNaN(fromIndex)) return
+                                                if (fromLane === 'stock') {
+                                                    if (fromIndex === index) return
+                                                    const newStock = [...expressionStock]
+                                                    const [moved] = newStock.splice(fromIndex, 1)
+                                                    newStock.splice(index, 0, moved)
+                                                    setExpressionStock(newStock)
+                                                } else if (fromLane === 'queue') {
+                                                    const expr = expressionQueue[fromIndex]
+                                                    setExpressionQueue(prev => prev.filter((_, i) => i !== fromIndex))
+                                                    const newStock = [...expressionStock]
+                                                    newStock.splice(index, 0, expr)
+                                                    setExpressionStock(newStock)
+                                                }
+                                            }}
+                                        >
+                                            <span className="emoji">{item.emoji}</span>
+                                            <span>{item.label}</span>
+                                        </button>
+                                    )
+                                })}
+                                {expressionStock.length === 0 && <div className="empty-hint">ストック</div>}
+                            </div>
+                            <div className="expression-loop-control">
+                                <button
+                                    className={`loop-toggle ${isAutoExpression ? 'active' : ''}`}
+                                    onClick={() => setIsAutoExpression(!isAutoExpression)}
+                                    title={isAutoExpression ? 'ループ停止' : 'ループ開始'}
+                                >
+                                    {isAutoExpression ? '⏹️' : '▶️'}
+                                </button>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="30"
+                                    value={expressionInterval}
+                                    onChange={(e) => setExpressionInterval(Number(e.target.value))}
+                                    className="interval-slider"
+                                    title={`インターバル: ${expressionInterval}秒`}
+                                />
+                                <span className="interval-label">{expressionInterval}s</span>
+                            </div>
                         </div>
                         <AnimationPlaylist
                             queue={animationQueue}
@@ -730,6 +833,7 @@ function App(): JSX.Element {
                             intervalSecs={animationIntervalSecs}
                             onIntervalChange={setAnimationIntervalSecs}
                             intervalProgress={intervalProgress}
+                            onPlayAnimation={(id) => handleAnimationPresetChange(id)}
                             t={t}
                         />
                     </>
@@ -780,10 +884,6 @@ function App(): JSX.Element {
                     onColorAdjustmentChange={setColorAdjustment}
                     expression={currentExpression}
                     onExpressionChange={setCurrentExpression}
-                    isAutoExpression={isAutoExpression}
-                    onAutoExpressionToggle={() => setIsAutoExpression(!isAutoExpression)}
-                    expressionInterval={expressionInterval}
-                    onExpressionIntervalChange={setExpressionInterval}
                     isGreenScreen={isGreenScreen}
                     onGreenScreenToggle={() => setIsGreenScreen(!isGreenScreen)}
                     onSaveCameraPosition={saveCameraPosition}

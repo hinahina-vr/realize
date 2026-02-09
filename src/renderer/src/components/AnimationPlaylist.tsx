@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import type { Translations } from '../i18n'
 
 interface AnimationItem {
@@ -17,7 +17,8 @@ interface AnimationPlaylistProps {
     onLoopToggle: () => void
     intervalSecs: number
     onIntervalChange: (secs: number) => void
-    intervalProgress: number // 0-100% カウントダウン
+    intervalProgress: number
+    onPlayAnimation: (id: string) => void
     t: Translations
 }
 
@@ -42,181 +43,182 @@ export function AnimationPlaylist({
     intervalSecs,
     onIntervalChange,
     intervalProgress,
+    onPlayAnimation,
     t
 }: AnimationPlaylistProps): JSX.Element {
-    const [draggedItem, setDraggedItem] = useState<{ id: string; fromLane: 'queue' | 'stock' } | null>(null)
-    const [dragOverLane, setDragOverLane] = useState<'queue' | 'stock' | null>(null)
-    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-    const dragCounterRef = useRef(0)
+
+    const [movingItem, setMovingItem] = useState<{ id: string; direction: 'to-stock' | 'to-queue' } | null>(null)
+    const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     const getItemById = (id: string): AnimationItem | undefined => {
         return ANIMATION_ITEMS.find(item => item.id === id)
     }
 
-    const handleDragStart = useCallback((e: React.DragEvent, id: string, fromLane: 'queue' | 'stock') => {
-        setDraggedItem({ id, fromLane })
-        e.dataTransfer.effectAllowed = 'move'
-        e.dataTransfer.setData('text/plain', id)
-        // ドラッグ中のスタイル
-        const target = e.target as HTMLElement
-        setTimeout(() => target.classList.add('dragging'), 0)
-    }, [])
+    // Queue→Stock移動（クリック）
+    const handleQueueClick = useCallback((id: string, index: number) => {
+        setMovingItem({ id, direction: 'to-stock' })
+        if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current)
+        moveTimeoutRef.current = setTimeout(() => {
+            onQueueChange(queue.filter((_, i) => i !== index))
+            onStockChange([...stock, id])
+            setMovingItem(null)
+        }, 250)
+    }, [queue, stock, onQueueChange, onStockChange])
 
-    const handleDragEnd = useCallback((e: React.DragEvent) => {
-        const target = e.target as HTMLElement
-        target.classList.remove('dragging')
-        setDraggedItem(null)
-        setDragOverLane(null)
-        setDragOverIndex(null)
-        dragCounterRef.current = 0
-    }, [])
-
-    const handleDragEnterLane = useCallback((lane: 'queue' | 'stock') => {
-        dragCounterRef.current++
-        setDragOverLane(lane)
-    }, [])
-
-    const handleDragLeaveLane = useCallback(() => {
-        dragCounterRef.current--
-        if (dragCounterRef.current === 0) {
-            setDragOverLane(null)
-            setDragOverIndex(null)
-        }
-    }, [])
-
-    const handleDragOverItem = useCallback((e: React.DragEvent, index: number) => {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
-        setDragOverIndex(index)
-    }, [])
-
-    const handleDrop = useCallback((e: React.DragEvent, toLane: 'queue' | 'stock', toIndex?: number) => {
-        e.preventDefault()
-        if (!draggedItem) return
-
-        const { id, fromLane } = draggedItem
-
-        // 同じレーン内での移動
-        if (fromLane === toLane) {
-            const items = fromLane === 'queue' ? [...queue] : [...stock]
-            const fromIndex = items.indexOf(id)
-            if (fromIndex === -1) return
-
-            items.splice(fromIndex, 1)
-            const insertIndex = toIndex !== undefined ?
-                (fromIndex < toIndex ? toIndex - 1 : toIndex) :
-                items.length
-            items.splice(insertIndex, 0, id)
-
-            if (fromLane === 'queue') {
-                onQueueChange(items)
-            } else {
-                onStockChange(items)
-            }
-        } else {
-            // 異なるレーン間での移動
-            const sourceItems = fromLane === 'queue' ? [...queue] : [...stock]
-            const targetItems = toLane === 'queue' ? [...queue] : [...stock]
-
-            const fromIndex = sourceItems.indexOf(id)
-            if (fromIndex === -1) return
-
-            sourceItems.splice(fromIndex, 1)
-            const insertIndex = toIndex !== undefined ? toIndex : targetItems.length
-            targetItems.splice(insertIndex, 0, id)
-
-            if (fromLane === 'queue') {
-                onQueueChange(sourceItems)
-                onStockChange(targetItems)
-            } else {
-                onStockChange(sourceItems)
-                onQueueChange(targetItems)
-            }
-        }
-
-        setDraggedItem(null)
-        setDragOverLane(null)
-        setDragOverIndex(null)
-    }, [draggedItem, queue, stock, onQueueChange, onStockChange])
-
-    const renderItem = (id: string, lane: 'queue' | 'stock', index: number) => {
-        const item = getItemById(id)
-        if (!item) return null
-
-        const isPlaying = currentPlayingId === id
-        const isDragging = draggedItem?.id === id
-        const isDropTarget = dragOverLane === lane && dragOverIndex === index
-
-        return (
-            <div
-                key={id}
-                className={`animation-playlist-item ${isPlaying ? 'playing' : ''} ${isDragging ? 'dragging' : ''} ${isDropTarget ? 'drop-target' : ''}`}
-                draggable
-                onDragStart={(e) => handleDragStart(e, id, lane)}
-                onDragEnd={handleDragEnd}
-                onDragOver={(e) => handleDragOverItem(e, index)}
-            >
-                <span className="emoji">{item.emoji}</span>
-                <span className="label">{t.animation[item.label as keyof typeof t.animation] || item.label}</span>
-            </div>
-        )
-    }
+    // Stock→Queue移動（クリック）
+    const handleStockClick = useCallback((id: string, index: number) => {
+        setMovingItem({ id, direction: 'to-queue' })
+        if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current)
+        moveTimeoutRef.current = setTimeout(() => {
+            onStockChange(stock.filter((_, i) => i !== index))
+            onQueueChange([...queue, id])
+            setMovingItem(null)
+        }, 250)
+    }, [queue, stock, onQueueChange, onStockChange, onPlayAnimation])
 
     return (
-        <div className="animation-playlist">
-            <div
-                className={`playlist-lane queue ${dragOverLane === 'queue' ? 'drag-over' : ''}`}
-                onDragEnter={() => handleDragEnterLane('queue')}
-                onDragLeave={handleDragLeaveLane}
+        <div className="expression-playlist">
+            <div className="expression-lane expression-queue"
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleDrop(e, 'queue', dragOverIndex ?? undefined)}
+                onDrop={(e) => {
+                    e.preventDefault()
+                    const fromLane = e.dataTransfer.getData('anim-lane')
+                    const fromIndex = Number(e.dataTransfer.getData('anim-index'))
+                    if (fromLane === 'stock' && !isNaN(fromIndex)) {
+                        const id = stock[fromIndex]
+                        onStockChange(stock.filter((_, i) => i !== fromIndex))
+                        onQueueChange([...queue, id])
+                    }
+                }}
             >
-
-                <div className="lane-items">
-                    {queue.map((id, index) => renderItem(id, 'queue', index))}
-                    {queue.length === 0 && <div className="empty-hint">ドロップ</div>}
-                </div>
-                <div className={`interval-control ${intervalProgress > 0 ? 'counting' : ''}`}>
-                    <button
-                        className={`loop-toggle ${isLooping ? 'active' : ''}`}
-                        onClick={onLoopToggle}
-                        title={isLooping ? 'ループ停止' : 'ループ開始'}
-                    >
-                        {isLooping ? '⏹️' : '▶️'}
-                    </button>
-                    <div className="slider-wrapper">
-                        <input
-                            type="range"
-                            min="0"
-                            max="10"
-                            value={intervalSecs}
-                            onChange={(e) => onIntervalChange(Number(e.target.value))}
-                            className="interval-slider"
-                            title={`インターバル: ${intervalSecs}秒`}
-                        />
-                        {intervalProgress > 0 && (
-                            <div
-                                className="interval-progress-bar"
-                                style={{ width: `${intervalProgress}%` }}
-                            />
-                        )}
-                    </div>
-                    <span className="interval-label">{intervalSecs}s</span>
-                </div>
+                {queue.map((id, index) => {
+                    const item = getItemById(id)
+                    if (!item) return null
+                    const isPlaying = currentPlayingId === id
+                    const currentIdx = queue.indexOf(currentPlayingId ?? '')
+                    const isNext = isLooping && currentIdx >= 0 && queue[(currentIdx + 1) % queue.length] === id && !isPlaying
+                    const isMoving = movingItem?.id === id && movingItem?.direction === 'to-stock'
+                    return (
+                        <button
+                            key={`${item.id}-${index}`}
+                            className={`expression-btn ${isPlaying ? 'active' : ''} ${isPlaying && isLooping ? 'countdown' : ''} ${isNext ? 'next' : ''} ${isMoving ? 'moving-out' : ''}`}
+                            style={isPlaying && isLooping && intervalProgress > 0 ? { '--progress': `${intervalProgress}%` } as React.CSSProperties : {}}
+                            onClick={() => handleQueueClick(id, index)}
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('anim-lane', 'queue')
+                                e.dataTransfer.setData('anim-index', String(index))
+                            }}
+                            onDragOver={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                const fromLane = e.dataTransfer.getData('anim-lane')
+                                const fromIdx = Number(e.dataTransfer.getData('anim-index'))
+                                if (isNaN(fromIdx)) return
+                                if (fromLane === 'queue') {
+                                    if (fromIdx === index) return
+                                    const newQueue = [...queue]
+                                    const [moved] = newQueue.splice(fromIdx, 1)
+                                    newQueue.splice(index, 0, moved)
+                                    onQueueChange(newQueue)
+                                } else if (fromLane === 'stock') {
+                                    const movedId = stock[fromIdx]
+                                    onStockChange(stock.filter((_, i) => i !== fromIdx))
+                                    const newQueue = [...queue]
+                                    newQueue.splice(index, 0, movedId)
+                                    onQueueChange(newQueue)
+                                }
+                            }}
+                        >
+                            <span className="emoji">{item.emoji}</span>
+                            <span>{t.animation[item.label as keyof typeof t.animation] || item.label}</span>
+                        </button>
+                    )
+                })}
+                {queue.length === 0 && <div className="empty-hint">ドロップ</div>}
             </div>
-
-            <div
-                className={`playlist-lane stock ${dragOverLane === 'stock' ? 'drag-over' : ''}`}
-                onDragEnter={() => handleDragEnterLane('stock')}
-                onDragLeave={handleDragLeaveLane}
+            <div className="expression-divider" />
+            <div className="expression-lane expression-stock"
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleDrop(e, 'stock', dragOverIndex ?? undefined)}
+                onDrop={(e) => {
+                    e.preventDefault()
+                    const fromLane = e.dataTransfer.getData('anim-lane')
+                    const fromIdx = Number(e.dataTransfer.getData('anim-index'))
+                    if (fromLane === 'queue' && !isNaN(fromIdx)) {
+                        const id = queue[fromIdx]
+                        onQueueChange(queue.filter((_, i) => i !== fromIdx))
+                        onStockChange([...stock, id])
+                    }
+                }}
             >
-
-                <div className="lane-items">
-                    {stock.map((id, index) => renderItem(id, 'stock', index))}
-                    {stock.length === 0 && <div className="empty-hint">-</div>}
-                </div>
+                {stock.map((id, index) => {
+                    const item = getItemById(id)
+                    if (!item) return null
+                    const isMoving = movingItem?.id === id && movingItem?.direction === 'to-queue'
+                    return (
+                        <button
+                            key={`${item.id}-${index}`}
+                            className={`expression-btn stock ${isMoving ? 'moving-in' : ''}`}
+                            onClick={() => handleStockClick(id, index)}
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('anim-lane', 'stock')
+                                e.dataTransfer.setData('anim-index', String(index))
+                            }}
+                            onDragOver={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                const fromLane = e.dataTransfer.getData('anim-lane')
+                                const fromIdx = Number(e.dataTransfer.getData('anim-index'))
+                                if (isNaN(fromIdx)) return
+                                if (fromLane === 'stock') {
+                                    if (fromIdx === index) return
+                                    const newStock = [...stock]
+                                    const [moved] = newStock.splice(fromIdx, 1)
+                                    newStock.splice(index, 0, moved)
+                                    onStockChange(newStock)
+                                } else if (fromLane === 'queue') {
+                                    const movedId = queue[fromIdx]
+                                    onQueueChange(queue.filter((_, i) => i !== fromIdx))
+                                    const newStock = [...stock]
+                                    newStock.splice(index, 0, movedId)
+                                    onStockChange(newStock)
+                                }
+                            }}
+                        >
+                            <span className="emoji">{item.emoji}</span>
+                            <span>{t.animation[item.label as keyof typeof t.animation] || item.label}</span>
+                        </button>
+                    )
+                })}
+                {stock.length === 0 && <div className="empty-hint">ストック</div>}
+            </div>
+            <div className="expression-loop-control">
+                <button
+                    className={`loop-toggle ${isLooping ? 'active' : ''}`}
+                    onClick={onLoopToggle}
+                    title={isLooping ? 'ループ停止' : 'ループ開始'}
+                >
+                    {isLooping ? '⏹️' : '▶️'}
+                </button>
+                <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={intervalSecs}
+                    onChange={(e) => onIntervalChange(Number(e.target.value))}
+                    className="interval-slider"
+                    title={`インターバル: ${intervalSecs}秒`}
+                />
+                <span className="interval-label">{intervalSecs}s</span>
             </div>
         </div>
     )
