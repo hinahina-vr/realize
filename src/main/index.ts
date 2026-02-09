@@ -194,7 +194,7 @@ function sendFrame(frameData: Buffer): boolean {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.realize')
+  electronApp.setAppUserModelId('com.hinahina.realize-cam')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
 
-test.describe('Realize App E2E Tests', () => {
+test.describe('Realize Cam App E2E Tests', () => {
     let page: Page
 
     test.beforeEach(async ({ page: testPage }) => {

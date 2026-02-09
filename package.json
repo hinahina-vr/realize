@@ -1,10 +1,10 @@
 {
-  "name": "realize",
+  "name": "realize-cam",
   "version": "1.0.0",
   "description": "VRM Virtual Camera App for Video Meetings",
   "main": "./out/main/index.js",
-  "author": "realize",
-  "homepage": "https://github.com/realize",
+  "author": "realize-cam",
+  "homepage": "https://github.com/realize-cam",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",

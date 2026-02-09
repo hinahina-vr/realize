@@ -1,6 +1,6 @@
 <h1 align="center">
-  <img src="./src/renderer/src/assets/logo.png" width="200" alt="Realize Logo"><br>
-  Realize
+  <img src="./src/renderer/src/assets/logo.png" width="200" alt="Realize Virtual Camera Logo"><br>
+  Realize Virtual Camera
 </h1>
 
 <p align="center">
@@ -30,7 +30,7 @@
 ## ✨ 特徴
 
 - **🎭 VRMモデル対応** - VRM形式の3Dアバターをドラッグ&ドロップで読み込み
-- **🎥 仮想カメラ出力** - OBS Virtual Camera経由でZoom/Teams/Meetに直接配信
+- **🎥 仮想カメラ出力** - Realize Virtual Camera経由でZoom/Teams/Meetに直接配信
 - **🎤 リアルタイムリップシンク** - マイク入力に同期した口パク
 - **😊 自動表情切り替え** - ランダムで表情が自然に変化（通常・笑顔・リラックス等）
 - **💃 VRMAアニメーション** - 外部アニメーションファイル(.vrma)に対応
@@ -45,22 +45,31 @@
 
 ## 🚀 クイックスタート
 
-### Windows版 インストール（推奨）
+### Windows版 インストーラー（推奨）
 
 1. **インストーラーをダウンロード**
-   - `realize-1.0.0-setup.exe` をダウンロードして実行
+   - `realize-cam-1.0.0-setup.exe` をダウンロードして実行
+   - インストーラーが自動的に仮想カメラを登録します
+
+2. **アプリを起動**
+   - スタートメニューから「Realize Virtual Camera」を起動
+
+3. **Zoom/Teams/Meetで使用**
+   - カメラ設定で「**Realize Virtual Camera**」を選択
+
+### Windows版 ZIP（ポータブル）
+
+1. **ZIPをダウンロード**
+   - `realize-cam-1.0.0-win.zip` をダウンロードして展開
 
 2. **仮想カメラを登録**（管理者権限が必要・初回のみ）
-   ```powershell
-   # 管理者としてPowerShellを開いて実行
-   regsvr32 "C:\Program Files\realize\resources\vcam-service.dll"
-   ```
+   - `resources/scripts/register-vcam.bat` を右クリック →「管理者として実行」
 
 3. **アプリを起動**
-   - スタートメニューから「Realize」を起動
+   - `RealizeCam.exe` を実行
 
-4. **Zoom/Teams/Meetで使用**
-   - カメラ設定で「**Hinahina Virtual Camera**」を選択
+4. **アンインストール時**
+   - `resources/scripts/unregister-vcam.bat` を右クリック →「管理者として実行」で仮想カメラを解除
 
 ---
 
@@ -87,7 +96,7 @@ npm run dev
 #### ビルド
 
 ```bash
-# Windows
+# Windows（SETUP.EXE + ZIP両方）
 npm run build:win
 ```
 
@@ -107,9 +116,8 @@ npm run build:win
 - マイクを選択してONにするとリアルタイムで口が動く
 
 ### 4. 仮想カメラ配信
-1. **OBSで一度「仮想カメラ開始」→「停止」を実行**（初回のみ）
-2. Realizeで「仮想カメラ起動」をクリック
-3. Zoom等で「OBS Virtual Camera」を選択
+1. 「仮想カメラ起動」をクリック
+2. Zoom等で「Realize Virtual Camera」を選択
 
 ---
 
@@ -129,7 +137,7 @@ npm run build:win
 ## 📁 プロジェクト構成
 
 ```
-realize/
+realize-cam/
 ├── src/
 │   ├── main/           # Electronメインプロセス
 │   ├── preload/        # プリロードスクリプト
@@ -142,7 +150,8 @@ realize/
 │           ├── i18n/              # 多言語翻訳
 │           └── App.tsx            # メインアプリ
 ├── scripts/
-│   └── virtual_camera_bridge.py   # Python仮想カメラブリッジ
+│   ├── register-vcam.bat          # 仮想カメラ登録（ZIP版用）
+│   └── unregister-vcam.bat        # 仮想カメラ解除（ZIP版用）
 └── resources/                      # アプリアイコン等
 ```
 
@@ -167,7 +176,7 @@ realize/
 
 1. 管理者権限でDLLを登録してください：
    ```powershell
-   regsvr32 "C:\Program Files\realize\resources\vcam-service.dll"
+   regsvr32 "C:\Program Files\realize-cam\resources\vcam-service.dll"
    ```
 
 2. PCを再起動してください

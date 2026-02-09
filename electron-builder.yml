@@ -1,5 +1,5 @@
-appId: com.hinahina.realize
-productName: Realize
+appId: com.hinahina.realize-cam
+productName: Realize Virtual Camera
 directories:
   buildResources: build
 files:
@@ -20,10 +20,13 @@ extraResources:
   - from: ../vcam/build/driver/Release/vcam-driver.dll
     to: vcam-driver.dll
 win:
-  executableName: Realize
+  executableName: RealizeCam
   requestedExecutionLevel: requireAdministrator
+  target:
+    - nsis
+    - zip
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: realize-cam-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always

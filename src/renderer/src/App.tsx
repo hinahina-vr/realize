@@ -88,7 +88,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     language: detectLanguage()
 }
 
-const SETTINGS_KEY = 'realize_settings'
+const SETTINGS_KEY = 'realize_cam_settings'
 
 function loadSettings(): AppSettings {
     try {
@@ -597,7 +597,7 @@ function App(): JSX.Element {
         <div className="app">
             <header className="app-header">
                 <div className="header-logo">
-                    <img src={logoImage} alt="Project Realize" className="logo-image" />
+                    <img src={logoImage} alt="Realize Virtual Camera" className="logo-image" />
                 </div>
                 <div className="header-info">
                     <span className="size-badge">📺 {windowSize.width}×{windowSize.height}</span>
