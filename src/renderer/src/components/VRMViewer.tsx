@@ -338,13 +338,19 @@ function VRMModel({
         if (shouldAutoBlink) {
             if (Math.random() < 0.002) {
                 vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 1)
+                vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft, 1)
+                vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, 1)
                 setTimeout(() => {
                     vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 0)
+                    vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft, 0)
+                    vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, 0)
                 }, 150)
             }
         } else {
             // 条件外では常にまばたき値を戻す
             vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 0)
+            vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkLeft, 0)
+            vrm.expressionManager?.setValue(VRMExpressionPresetName.BlinkRight, 0)
         }
 
         // 表情適用
