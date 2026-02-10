@@ -27,7 +27,10 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-background-timer-throttling')
   app.commandLine.appendSwitch('disable-renderer-backgrounding')
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
-  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+  app.commandLine.appendSwitch(
+    'disable-features',
+    'CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,UseEcoQoSForBackgroundProcess'
+  )
 }
 
 // 仮想カメラインスタンス
@@ -42,7 +45,7 @@ function enablePerformanceMode(): void {
   if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
     return
   }
-  powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension')
+  powerSaveBlockerId = powerSaveBlocker.start('prevent-display-sleep')
 }
 
 function disablePerformanceMode(): void {

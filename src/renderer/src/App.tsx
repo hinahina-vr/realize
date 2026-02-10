@@ -168,7 +168,8 @@ function App(): JSX.Element {
     const [language, setLanguage] = useState<Language>(initialSettings.language)
     const t = getTranslation(language)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
-    const frameIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const frameLoopTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const isSendingFrameRef = useRef(false)
     const autoExpressionRef = useRef<NodeJS.Timeout | null>(null)
     const cameraRef = useRef<{
         getPosition: () => { position: [number, number, number]; target: [number, number, number] }
@@ -357,42 +358,63 @@ function App(): JSX.Element {
     // 仮想カメラへのフレーム送信
     const sendFrameToVirtualCamera = useCallback(async () => {
         if (!isVirtualCameraActiveRef.current || !canvasRef.current) return
+        if (isSendingFrameRef.current) return
 
-        const canvas = canvasRef.current
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-
-        // Three.jsキャンバスを取得
-        const threeCanvas = document.querySelector('.vrm-viewer canvas') as HTMLCanvasElement
-        if (!threeCanvas) return
-
-        const { width, height } = OUTPUT_SIZE_MAP[outputSizeRef.current]
-        canvas.width = width
-        canvas.height = height
-
-        // Three.jsキャンバスをリサイズして描画
-        ctx.drawImage(threeCanvas, 0, 0, width, height)
-
-        // RGBAデータを取得
-        const imageData = ctx.getImageData(0, 0, width, height)
-        const frameData = new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.byteLength)
-
+        isSendingFrameRef.current = true
         try {
+            const canvas = canvasRef.current
+            const ctx = canvas.getContext('2d')
+            if (!ctx) return
+
+            // Three.js canvas
+            const threeCanvas = document.querySelector('.vrm-viewer canvas') as HTMLCanvasElement
+            if (!threeCanvas) return
+
+            const { width, height } = OUTPUT_SIZE_MAP[outputSizeRef.current]
+            canvas.width = width
+            canvas.height = height
+
+            ctx.drawImage(threeCanvas, 0, 0, width, height)
+
+            // RGBA data
+            const imageData = ctx.getImageData(0, 0, width, height)
+            const frameData = new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.byteLength)
+
             await window.api.virtualCamera.sendFrame(frameData)
         } catch (error) {
             console.error('Failed to send frame:', error)
+        } finally {
+            isSendingFrameRef.current = false
         }
     }, [])
+
+    const stopFrameLoop = useCallback(() => {
+        if (frameLoopTimerRef.current) {
+            clearTimeout(frameLoopTimerRef.current)
+            frameLoopTimerRef.current = null
+        }
+        isSendingFrameRef.current = false
+    }, [])
+
+    const startFrameLoop = useCallback(() => {
+        stopFrameLoop()
+
+        const tick = async (): Promise<void> => {
+            if (!isVirtualCameraActiveRef.current) return
+            await sendFrameToVirtualCamera()
+            if (!isVirtualCameraActiveRef.current) return
+            frameLoopTimerRef.current = setTimeout(tick, 33)
+        }
+
+        frameLoopTimerRef.current = setTimeout(tick, 0)
+    }, [sendFrameToVirtualCamera, stopFrameLoop])
 
     // 仮想カメラのON/OFF
     const handleVirtualCameraToggle = useCallback(async () => {
         if (isVirtualCameraOn) {
             // 停止
             isVirtualCameraActiveRef.current = false
-            if (frameIntervalRef.current) {
-                clearInterval(frameIntervalRef.current)
-                frameIntervalRef.current = null
-            }
+            stopFrameLoop()
             await window.api.virtualCamera.stop()
             setIsVirtualCameraOn(false)
         } else {
@@ -405,7 +427,7 @@ function App(): JSX.Element {
                     setIsVirtualCameraOn(true)
                     isVirtualCameraActiveRef.current = true
                     // フレーム送信を開始 (30fps = 約33ms間隔)
-                    frameIntervalRef.current = setInterval(sendFrameToVirtualCamera, 33)
+                    startFrameLoop()
                 } else {
                     alert('仮想カメラの起動に失敗しました。OBSを一度起動して「仮想カメラ開始」→「仮想カメラ停止」を行ってください。')
                 }
@@ -416,17 +438,15 @@ function App(): JSX.Element {
                 setIsVirtualCameraConnecting(false)
             }
         }
-    }, [isVirtualCameraOn, outputSize, sendFrameToVirtualCamera])
+    }, [isVirtualCameraOn, outputSize, startFrameLoop, stopFrameLoop])
 
     // クリーンアップ
     useEffect(() => {
         return () => {
-            if (frameIntervalRef.current) {
-                clearInterval(frameIntervalRef.current)
-            }
+            stopFrameLoop()
             window.api.virtualCamera.stop()
         }
-    }, [])
+    }, [stopFrameLoop])
 
     const handleFileDrop = useCallback((file: File, filePath: string | null) => {
         const url = URL.createObjectURL(file)
