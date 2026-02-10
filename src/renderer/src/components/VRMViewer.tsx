@@ -331,12 +331,20 @@ function VRMModel({
             }
         }
 
-        // まばたき（ランダム、よりゆっくり）
-        if (Math.random() < 0.002) {
-            vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 1)
-            setTimeout(() => {
-                vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 0)
-            }, 150)
+        // 自動まばたき:
+        // - 通常表情(neutral)のときのみ有効
+        // - アニメーション有効中は無効
+        const shouldAutoBlink = expression === 'neutral' && !animationUrl
+        if (shouldAutoBlink) {
+            if (Math.random() < 0.002) {
+                vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 1)
+                setTimeout(() => {
+                    vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 0)
+                }, 150)
+            }
+        } else {
+            // 条件外では常にまばたき値を戻す
+            vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, 0)
         }
 
         // 表情適用
