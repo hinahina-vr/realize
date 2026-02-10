@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import * as crypto from 'crypto'
+import os from 'os'
 import icon from '../../resources/icon.png?asset'
 
 // VRMA暗号化キー（encrypt-vrma.jsと同じキー）
@@ -27,6 +28,7 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-background-timer-throttling')
   app.commandLine.appendSwitch('disable-renderer-backgrounding')
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+  app.commandLine.appendSwitch('disable-frame-rate-limit')
   app.commandLine.appendSwitch(
     'disable-features',
     'CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,UseEcoQoSForBackgroundProcess'
@@ -40,6 +42,7 @@ let currentWidth = 1280
 let currentHeight = 720
 let nv12BufferSize = 0
 let powerSaveBlockerId: number | null = null
+const TARGET_PRIORITY = os.constants.priority.PRIORITY_ABOVE_NORMAL
 
 function enablePerformanceMode(): void {
   if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
@@ -58,6 +61,29 @@ function disablePerformanceMode(): void {
   powerSaveBlockerId = null
 }
 
+function setProcessPrioritySafe(pid: number, label: string): void {
+  if (process.platform !== 'win32') return
+  try {
+    os.setPriority(pid, TARGET_PRIORITY)
+    console.log(`Process priority boosted (${label}): pid=${pid}`)
+  } catch (error) {
+    console.warn(`Failed to boost process priority (${label}):`, error)
+  }
+}
+
+function boostProcessPriorities(window?: BrowserWindow): void {
+  if (process.platform !== 'win32') return
+  setProcessPrioritySafe(process.pid, 'main')
+
+  const targetWindow = window ?? BrowserWindow.getAllWindows()[0]
+  if (!targetWindow) return
+
+  const rendererPid = targetWindow.webContents.getOSProcessId()
+  if (rendererPid > 0) {
+    setProcessPrioritySafe(rendererPid, 'renderer')
+  }
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1200,
@@ -74,6 +100,11 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  mainWindow.webContents.setBackgroundThrottling(false)
+  mainWindow.webContents.on('dom-ready', () => {
+    boostProcessPriorities(mainWindow)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -169,6 +200,7 @@ function startVirtualCamera(width: number, height: number, _fps: number): Promis
       virtualCamera.start(width, height)
       isVirtualCameraReady = true
       enablePerformanceMode()
+      boostProcessPriorities()
 
       console.log(`Virtual camera started: ${width}x${height}, NV12 buffer size: ${nv12BufferSize}`)
       resolve(true)
@@ -239,6 +271,7 @@ function sendFrame(frameData: Buffer): boolean {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.hinahina.realize-cam')
+  boostProcessPriorities()
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
