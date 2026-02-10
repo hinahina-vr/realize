@@ -1,5 +1,6 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, powerSaveBlocker } from 'electron'
 import { readFile as readFileAsync } from 'fs/promises'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import * as crypto from 'crypto'
@@ -21,12 +22,38 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught exception:', err)
 })
 
+if (process.platform === 'win32') {
+  // Keep render/update loops from being throttled when the window is occluded or in background.
+  app.commandLine.appendSwitch('disable-background-timer-throttling')
+  app.commandLine.appendSwitch('disable-renderer-backgrounding')
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+}
+
 // 仮想カメラインスタンス
 let virtualCamera: InstanceType<typeof VCam> | null = null
 let isVirtualCameraReady = false
 let currentWidth = 1280
 let currentHeight = 720
 let nv12BufferSize = 0
+let powerSaveBlockerId: number | null = null
+
+function enablePerformanceMode(): void {
+  if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+    return
+  }
+  powerSaveBlockerId = powerSaveBlocker.start('prevent-app-suspension')
+}
+
+function disablePerformanceMode(): void {
+  if (powerSaveBlockerId === null) {
+    return
+  }
+  if (powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+    powerSaveBlocker.stop(powerSaveBlockerId)
+  }
+  powerSaveBlockerId = null
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -83,9 +110,11 @@ function rgbaToNv12(rgbaData: Buffer, width: number, height: number): Buffer {
   for (let y = 0; y < height; y += 2) {
     for (let x = 0; x < width; x += 2) {
       // 2x2ブロックの平均を取る
-      let rSum = 0, gSum = 0, bSum = 0
-      for (let dy = 0; dy < 2 && (y + dy) < height; dy++) {
-        for (let dx = 0; dx < 2 && (x + dx) < width; dx++) {
+      let rSum = 0
+      let gSum = 0
+      let bSum = 0
+      for (let dy = 0; dy < 2 && y + dy < height; dy++) {
+        for (let dx = 0; dx < 2 && x + dx < width; dx++) {
           const px = ((y + dy) * width + (x + dx)) * 4
           rSum += rgbaData[px]
           gSum += rgbaData[px + 1]
@@ -117,7 +146,7 @@ function startVirtualCamera(width: number, height: number, _fps: number): Promis
       if (virtualCamera) {
         try {
           virtualCamera.stop()
-        } catch (e) {
+        } catch {
           // ignore
         }
         virtualCamera = null
@@ -131,10 +160,12 @@ function startVirtualCamera(width: number, height: number, _fps: number): Promis
       nv12BufferSize = layout.size
       currentWidth = width
       currentHeight = height
+      frameCounter = 0
 
       // 仮想カメラを開始
       virtualCamera.start(width, height)
       isVirtualCameraReady = true
+      enablePerformanceMode()
 
       console.log(`Virtual camera started: ${width}x${height}, NV12 buffer size: ${nv12BufferSize}`)
       resolve(true)
@@ -142,6 +173,7 @@ function startVirtualCamera(width: number, height: number, _fps: number): Promis
       console.error('Failed to start virtual camera:', error)
       virtualCamera = null
       isVirtualCameraReady = false
+      disablePerformanceMode()
       resolve(false)
     }
   })
@@ -159,12 +191,21 @@ function stopVirtualCamera(): void {
     isVirtualCameraReady = false
     console.log('Virtual camera stopped')
   }
+  disablePerformanceMode()
 }
 
 // フレームを送信
 let frameCounter = 0
 function sendFrame(frameData: Buffer): boolean {
   if (!virtualCamera || !isVirtualCameraReady) {
+    return false
+  }
+
+  const expectedSize = currentWidth * currentHeight * 4
+  if (frameData.length !== expectedSize) {
+    if (frameCounter % 30 === 0) {
+      console.error(`Frame size mismatch: got ${frameData.length}, expected ${expectedSize}`)
+    }
     return false
   }
 
@@ -177,7 +218,7 @@ function sendFrame(frameData: Buffer): boolean {
         samplePixels.push(frameData[i])
       }
       console.log(`Frame ${frameCounter}: Input RGBA first 20 bytes:`, samplePixels)
-      console.log(`  Input size: ${frameData.length}, Expected: ${currentWidth * currentHeight * 4}`)
+      console.log(`  Input size: ${frameData.length}, Expected: ${expectedSize}`)
     }
 
     // RGBA → NV12 変換
@@ -213,7 +254,8 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('virtual-camera:send-frame', (_, frameData: Uint8Array) => {
-    return sendFrame(Buffer.from(frameData))
+    const input = Buffer.from(frameData.buffer, frameData.byteOffset, frameData.byteLength)
+    return sendFrame(input)
   })
 
   ipcMain.handle('virtual-camera:is-ready', () => {
@@ -269,9 +311,20 @@ app.whenReady().then(() => {
 
     // 開発モード: プロジェクトルート/resources
     // 本番モード: process.resourcesPath
-    const encryptedPath = is.dev
-      ? join(app.getAppPath(), 'resources', 'animations.enc')
-      : join(process.resourcesPath, 'animations.enc')
+    const encryptedPathCandidates = is.dev
+      ? [join(app.getAppPath(), 'resources', 'animations.enc')]
+      : [
+          join(process.resourcesPath, 'animations.enc'),
+          join(app.getAppPath(), 'resources', 'animations.enc'),
+          join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'animations.enc'),
+          join(process.resourcesPath, 'app.asar', 'resources', 'animations.enc')
+        ]
+
+    const encryptedPath = encryptedPathCandidates.find((p) => existsSync(p))
+    if (!encryptedPath) {
+      console.error('animations.enc not found. Checked:', encryptedPathCandidates)
+      return {}
+    }
 
     console.log('Loading VRMA presets from:', encryptedPath)
     try {
@@ -321,6 +374,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   stopVirtualCamera()
+  disablePerformanceMode()
   if (process.platform !== 'darwin') {
     app.quit()
   }

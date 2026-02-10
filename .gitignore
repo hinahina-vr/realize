@@ -6,4 +6,5 @@ out
 test-results/
 
 dist/
+dist*/
 dist.zip

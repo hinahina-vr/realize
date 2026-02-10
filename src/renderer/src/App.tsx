@@ -375,7 +375,7 @@ function App(): JSX.Element {
 
         // RGBAデータを取得
         const imageData = ctx.getImageData(0, 0, width, height)
-        const frameData = new Uint8Array(imageData.data.buffer)
+        const frameData = new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.byteLength)
 
         try {
             await window.api.virtualCamera.sendFrame(frameData)

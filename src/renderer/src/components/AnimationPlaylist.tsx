@@ -54,16 +54,10 @@ export function AnimationPlaylist({
         return ANIMATION_ITEMS.find(item => item.id === id)
     }
 
-    // Queue→Stock移動（クリック）
-    const handleQueueClick = useCallback((id: string, index: number) => {
-        setMovingItem({ id, direction: 'to-stock' })
-        if (moveTimeoutRef.current) clearTimeout(moveTimeoutRef.current)
-        moveTimeoutRef.current = setTimeout(() => {
-            onQueueChange(queue.filter((_, i) => i !== index))
-            onStockChange([...stock, id])
-            setMovingItem(null)
-        }, 250)
-    }, [queue, stock, onQueueChange, onStockChange])
+    // Queue item click should play immediately.
+    const handleQueueClick = useCallback((id: string) => {
+        onPlayAnimation(id)
+    }, [onPlayAnimation])
 
     // Stock→Queue移動（クリック）
     const handleStockClick = useCallback((id: string, index: number) => {
@@ -97,13 +91,12 @@ export function AnimationPlaylist({
                     const isPlaying = currentPlayingId === id
                     const currentIdx = queue.indexOf(currentPlayingId ?? '')
                     const isNext = isLooping && currentIdx >= 0 && queue[(currentIdx + 1) % queue.length] === id && !isPlaying
-                    const isMoving = movingItem?.id === id && movingItem?.direction === 'to-stock'
                     return (
                         <button
                             key={`${item.id}-${index}`}
-                            className={`expression-btn ${isPlaying ? 'active' : ''} ${isPlaying && isLooping ? 'countdown' : ''} ${isNext ? 'next' : ''} ${isMoving ? 'moving-out' : ''}`}
+                            className={`expression-btn ${isPlaying ? 'active' : ''} ${isPlaying && isLooping ? 'countdown' : ''} ${isNext ? 'next' : ''}`}
                             style={isPlaying && isLooping && intervalProgress > 0 ? { '--progress': `${intervalProgress}%` } as React.CSSProperties : {}}
-                            onClick={() => handleQueueClick(id, index)}
+                            onClick={() => handleQueueClick(id)}
                             draggable
                             onDragStart={(e) => {
                                 e.dataTransfer.setData('anim-lane', 'queue')

@@ -6,6 +6,48 @@ interface VirtualCameraPreviewProps {
     t: Translations
 }
 
+function rankDevice(label: string): number {
+    const lower = label.toLowerCase()
+    if (lower.includes('obs')) return 99
+    if (
+        lower.includes('hinahina') ||
+        lower.includes('realize') ||
+        lower.includes('virtual camera') ||
+        lower.includes('\u4eee\u60f3\u30ab\u30e1\u30e9')
+    ) {
+        return 0
+    }
+    if (lower.includes('virtual') || lower.includes('camera')) return 1
+    return 2
+}
+
+async function tryOpenDevice(
+    devices: MediaDeviceInfo[]
+): Promise<{ stream: MediaStream; label: string } | null> {
+    const sorted = [...devices].sort((a, b) => rankDevice(a.label) - rankDevice(b.label))
+
+    for (const device of sorted) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: device.deviceId } }
+            })
+            const trackLabel = stream.getVideoTracks()[0]?.label || ''
+
+            if (trackLabel.toLowerCase().includes('obs')) {
+                stream.getTracks().forEach((t) => t.stop())
+                continue
+            }
+
+            const label = trackLabel || device.label || 'Virtual Camera'
+            return { stream, label }
+        } catch {
+            // Try next candidate.
+        }
+    }
+
+    return null
+}
+
 export function VirtualCameraPreview({ isVirtualCameraOn, t }: VirtualCameraPreviewProps): JSX.Element | null {
     const [isPreviewOn, setIsPreviewOn] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -14,27 +56,25 @@ export function VirtualCameraPreview({ isVirtualCameraOn, t }: VirtualCameraPrev
     const streamRef = useRef<MediaStream | null>(null)
     const pendingStreamRef = useRef<MediaStream | null>(null)
 
-    // ストリームをvideo要素に設定
     useEffect(() => {
         if (isPreviewOn && pendingStreamRef.current && videoRef.current) {
             videoRef.current.srcObject = pendingStreamRef.current
             streamRef.current = pendingStreamRef.current
             pendingStreamRef.current = null
 
-            videoRef.current.play().catch(e => {
+            videoRef.current.play().catch((e) => {
                 console.error('Video play failed:', e)
             })
         }
     }, [isPreviewOn])
 
-    // プレビュー停止
     const stopPreview = useCallback(() => {
         if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop())
+            streamRef.current.getTracks().forEach((track) => track.stop())
             streamRef.current = null
         }
         if (pendingStreamRef.current) {
-            pendingStreamRef.current.getTracks().forEach(track => track.stop())
+            pendingStreamRef.current.getTracks().forEach((track) => track.stop())
             pendingStreamRef.current = null
         }
         if (videoRef.current) {
@@ -44,42 +84,33 @@ export function VirtualCameraPreview({ isVirtualCameraOn, t }: VirtualCameraPrev
         setError(null)
     }, [])
 
-    // プレビュー開始
     const startPreview = useCallback(async () => {
         try {
-            // まず任意のカメラにアクセスしてパーミッションを得る
+            // Ask media permission first so labels are populated if possible.
             try {
                 const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
-                tempStream.getTracks().forEach(t => t.stop())
+                tempStream.getTracks().forEach((t) => t.stop())
             } catch (e) {
                 console.log('Permission request failed:', e)
             }
 
-            // デバイス列挙
             const allDevices = await navigator.mediaDevices.enumerateDevices()
-            const videoDevices = allDevices.filter(d => d.kind === 'videoinput')
+            const videoDevices = allDevices.filter((d) => d.kind === 'videoinput')
 
-            // Hinahina Virtual Cameraを優先して探す
-            let targetCamera = videoDevices.find(d => d.label.includes('Hinahina'))
-            if (!targetCamera) {
-                targetCamera = videoDevices.find(d =>
-                    d.label.includes('Virtual Camera') && !d.label.includes('OBS')
-                )
-            }
-
-            if (!targetCamera) {
+            if (videoDevices.length === 0) {
                 setError(t.virtualCamera.previewNotFound)
                 return
             }
 
-            setCameraName(targetCamera.label)
+            const result = await tryOpenDevice(videoDevices)
+            if (!result) {
+                console.warn('No previewable camera found', videoDevices.map((d) => d.label || d.deviceId))
+                setError(t.virtualCamera.previewNotFound)
+                return
+            }
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: targetCamera.deviceId } }
-            })
-
-            // ストリームを保存してから、モーダルを表示
-            pendingStreamRef.current = stream
+            setCameraName(result.label)
+            pendingStreamRef.current = result.stream
             setIsPreviewOn(true)
             setError(null)
         } catch (e) {
@@ -88,21 +119,19 @@ export function VirtualCameraPreview({ isVirtualCameraOn, t }: VirtualCameraPrev
         }
     }, [t])
 
-    // 仮想カメラがOFFになったらプレビューも停止
     useEffect(() => {
         if (!isVirtualCameraOn && isPreviewOn) {
             stopPreview()
         }
     }, [isVirtualCameraOn, isPreviewOn, stopPreview])
 
-    // クリーンアップ
     useEffect(() => {
         return () => {
             if (streamRef.current) {
-                streamRef.current.getTracks().forEach(track => track.stop())
+                streamRef.current.getTracks().forEach((track) => track.stop())
             }
             if (pendingStreamRef.current) {
-                pendingStreamRef.current.getTracks().forEach(track => track.stop())
+                pendingStreamRef.current.getTracks().forEach((track) => track.stop())
             }
         }
     }, [])
@@ -113,38 +142,25 @@ export function VirtualCameraPreview({ isVirtualCameraOn, t }: VirtualCameraPrev
 
     return (
         <>
-            {/* トリガーボタン */}
             <div className="vcam-preview-trigger">
                 <span>{t.virtualCamera.preview}</span>
-                <button
-                    className="vcam-preview-toggle"
-                    onClick={startPreview}
-                >
+                <button className="vcam-preview-toggle" onClick={startPreview}>
                     {t.virtualCamera.previewCheck}
                 </button>
             </div>
             {error && <div className="vcam-preview-error">{error}</div>}
 
-            {/* モーダル - どこをクリックしても閉じる */}
             {isPreviewOn && (
                 <div className="vcam-modal-overlay" onClick={stopPreview}>
                     <div className="vcam-modal-content">
                         <div className="vcam-modal-header">
-                            <span>📹 {cameraName}</span>
+                            <span>Camera: {cameraName}</span>
                             <button className="vcam-modal-close" onClick={stopPreview}>
-                                ✕
+                                X
                             </button>
                         </div>
-                        <video
-                            ref={videoRef}
-                            className="vcam-modal-video"
-                            autoPlay
-                            playsInline
-                            muted
-                        />
-                        <div className="vcam-modal-footer">
-                            {t.virtualCamera.previewClose}
-                        </div>
+                        <video ref={videoRef} className="vcam-modal-video" autoPlay playsInline muted />
+                        <div className="vcam-modal-footer">{t.virtualCamera.previewClose}</div>
                     </div>
                 </div>
             )}
